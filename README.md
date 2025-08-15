@@ -1,0 +1,1 @@
+### NewBies Hackathon UQCS 2025
