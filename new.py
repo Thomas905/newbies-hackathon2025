@@ -6,9 +6,10 @@ from collections import deque
 
 webcam = cv.VideoCapture(0) # Capture using default webcam 
 
-# ----------- Tracking & decision params -----------
-pts = deque(maxlen=12) # Double-ended queue which store 12 recent frames
-DEADZONE   = 35 # Min movement distance between the oldest and newest hand position
+SMOOTH_ALPHA = 0.1 # lower -> smoother, higher -> snappier 
+ema = None # Smooth face coordinates
+pts = deque(maxlen=20) # Queue that store 20 smoothed centers
+DEADZONE   = 50 # Min movement distance between the oldest and newest hand position
                 # Ignore movement smaller than this
 COOLDOWN_S = 0.5 # Time taken between each consecutive commands
 last_cmd_time = 0.0 # Time point when last command was executed
@@ -16,7 +17,7 @@ last_cmd_time = 0.0 # Time point when last command was executed
 # ------ Function to get command from hand gesture ----------
 # -----------------------------------------------------------
 def determine_command(pts_list, deadzone):
-    if (len(pts_list) < 6): return ""
+    if (len(pts_list) < 8): return "STAY"
     # Get coordinates of hand from oldest frame and newest 
     (x0, y0), (x1, y1) = pts_list[0], pts_list[-1]
     # Change in x and y coordinates
@@ -28,7 +29,6 @@ def determine_command(pts_list, deadzone):
     else:
         # If more change in y axis than x axis
         return "DOWN" if (dy > deadzone) else "UP"
-    return ""
 
 # -------------------- Face detector -----------------------
 # ----------------------------------------------------------
@@ -66,8 +66,19 @@ while (webcam.isOpened()):
         # / (No of pixels = 2) 
         # = Middle pixels within a line of x/y coordinates
         centerX, centerY = fx + fw // 2, fy + fh // 2
+
+        # EMA smoothing
+        if ema is None:
+            ema = (centerX, centerY)
+        else:
+            # (1 - SMOOTH_ALPHA) * current_coordinates + SMOOTH_ALPHA * next_coordinates
+            # The lower the SMOOTH_ALPHA, the less adjustment of current_coordinates
+            ema = (int((1 - SMOOTH_ALPHA) * ema[0] + SMOOTH_ALPHA * centerX), 
+                   int((1 - SMOOTH_ALPHA) * ema[1] + SMOOTH_ALPHA * centerY))
+
         # Append coordinates to list
-        pts.append((centerX, centerY))
+        pts.append(ema)
+        cv.circle(frame, ema, 6, (255, 0, 0), -1)
 
     command = determine_command(list(pts), DEADZONE) # Get command
     now = time.time() # Get current time
