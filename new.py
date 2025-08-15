@@ -10,7 +10,7 @@ SMOOTH_ALPHA = 0.1 # lower -> smoother, higher -> snappier
 ema = None # Smooth face coordinates
 DEAD_ZONE = 40 # Zone 40 pixels from the center of the screen 
                # where no movement capture occured
-COOLDOWN_S = 2 # Time taken between each consecutive commands
+COOLDOWN_S = 1 # Time taken between each consecutive commands
 last_cmd_time = 0.0 # Time point when last command was executed
 
 # ------ Function to get command from face gesture ----------
@@ -86,7 +86,7 @@ while (webcam.isOpened()):
         cv.circle(frame, ema, 6, (255, 0, 0), -1)
 
     # Draw a screen box and its center (let center in the vicinity of the screen)
-    screen_center = ((frameW // 2) + 80, (frameH // 2) - 80)
+    screen_center = ((frameW // 2) + 80, (frameH // 2) - 100)
     cv.rectangle(frame, (screen_center[0] - DEAD_ZONE, screen_center[1] - DEAD_ZONE),
                  (screen_center[0] + DEAD_ZONE, screen_center[1] + DEAD_ZONE),
                  (0, 255, 255), 1)
