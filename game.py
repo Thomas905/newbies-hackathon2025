@@ -37,7 +37,7 @@ def layout_menu():
         for event in pygame.event.get():
             screen.fill(BLACK)
             if event.type == pygame.QUIT:
-                    running = False
+                running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_DOWN:
                     selected = (selected + 1) % len(buttons)
