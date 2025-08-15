@@ -8,27 +8,28 @@ webcam = cv.VideoCapture(0) # Capture using default webcam
 
 SMOOTH_ALPHA = 0.1 # lower -> smoother, higher -> snappier 
 ema = None # Smooth face coordinates
-pts = deque(maxlen=20) # Queue that store 20 smoothed centers
-DEADZONE   = 50 # Min movement distance between the oldest and newest hand position
-                # Ignore movement smaller than this
-COOLDOWN_S = 0.5 # Time taken between each consecutive commands
+pts = deque(maxlen=12) # Queue that store 20 smoothed centers
+ORIGIN_SLOPE = 0 
+COOLDOWN_S = 1 # Time taken between each consecutive commands
 last_cmd_time = 0.0 # Time point when last command was executed
 
 # ------ Function to get command from hand gesture ----------
 # -----------------------------------------------------------
-def determine_command(pts_list, deadzone):
+def determine_command(pts_list, origin):
     if (len(pts_list) < 8): return "STAY"
     # Get coordinates of hand from oldest frame and newest 
     (x0, y0), (x1, y1) = pts_list[0], pts_list[-1]
     # Change in x and y coordinates
     dx, dy = x1 - x0, y1 - y0
+    # print("dx, dy = ", dx, dy)
+    # print("\n")
 
     if (abs(dx) > abs(dy)):
         # If more change in x axis than y axis
-        return "RIGHT" if (dx > deadzone) else "LEFT"
+        return "RIGHT" if (dx > origin) else "LEFT"
     else:
         # If more change in y axis than x axis
-        return "DOWN" if (dy > deadzone) else "UP"
+        return "DOWN" if (dy > origin) else "UP"
 
 # -------------------- Face detector -----------------------
 # ----------------------------------------------------------
@@ -54,7 +55,7 @@ while (webcam.isOpened()):
     # Remove remaining small holes and speckles caused by lighting/shadows
     # (5, 5) kernel and omega = 0 => work in most lightning 
     gray = cv.GaussianBlur(gray, (5, 5), 0) 
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(80, 80))
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(40, 40))
     if (len(faces) > 0):
         # Capture the closest face to the camera
         # Get top left conner coordinates (fx, fy) 
@@ -80,15 +81,14 @@ while (webcam.isOpened()):
         pts.append(ema)
         cv.circle(frame, ema, 6, (255, 0, 0), -1)
 
-    command = determine_command(list(pts), DEADZONE) # Get command
+    command = determine_command(list(pts), ORIGIN_SLOPE) # Get command
     now = time.time() # Get current time
     if ((now - last_cmd_time) > COOLDOWN_S):
         # Print command every certain time
-        print(command)
+        print("Command = ",  command)
+        print("\n")
         last_cmd_time = now # Update time line
-
-    # Draw the command
-    if (command != ""):
+        # Draw the command
         cv.putText(frame, command, (20, 40), cv.FONT_HERSHEY_SIMPLEX, 1.1, (0, 200, 255), 3)
 
     # Open/update Frame window image
