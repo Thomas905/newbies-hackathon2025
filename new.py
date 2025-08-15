@@ -8,28 +8,31 @@ webcam = cv.VideoCapture(0) # Capture using default webcam
 
 SMOOTH_ALPHA = 0.1 # lower -> smoother, higher -> snappier 
 ema = None # Smooth face coordinates
-pts = deque(maxlen=12) # Queue that store 20 smoothed centers
-ORIGIN_SLOPE = 0 
-COOLDOWN_S = 1 # Time taken between each consecutive commands
+DEAD_ZONE = 40 # Zone 40 pixels from the center of the screen 
+               # where no movement capture occured
+COOLDOWN_S = 2 # Time taken between each consecutive commands
 last_cmd_time = 0.0 # Time point when last command was executed
 
-# ------ Function to get command from hand gesture ----------
+# ------ Function to get command from face gesture ----------
 # -----------------------------------------------------------
-def determine_command(pts_list, origin):
-    if (len(pts_list) < 8): return "STAY"
-    # Get coordinates of hand from oldest frame and newest 
-    (x0, y0), (x1, y1) = pts_list[0], pts_list[-1]
-    # Change in x and y coordinates
-    dx, dy = x1 - x0, y1 - y0
-    # print("dx, dy = ", dx, dy)
-    # print("\n")
+def determine_command(latest_face_center, screen_center, dead_zone):
+    if latest_face_center is None or screen_center is None:
+        return "STAY"
+    
+    dx = latest_face_center[0] - screen_center[0]
+    dy = latest_face_center[1] - screen_center[1]
 
-    if (abs(dx) > abs(dy)):
-        # If more change in x axis than y axis
-        return "RIGHT" if (dx > origin) else "LEFT"
+    def no_move(theta):
+        return 0 if (abs(theta) < dead_zone) else theta
+    
+    dx, dy = no_move(dx), no_move(dy)
+
+    if (abs(dx) == 0 and abs(dy) == 0): return "STAY"
     else:
-        # If more change in y axis than x axis
-        return "DOWN" if (dy > origin) else "UP"
+        if (dx > 0): return "RIGHT"
+        if (dx < 0): return "LEFT"
+        if (dy > 0): return "DOWN"
+        if (dy < 0): return "UP"
 
 # -------------------- Face detector -----------------------
 # ----------------------------------------------------------
@@ -46,6 +49,8 @@ while (webcam.isOpened()):
         print("Failed to grab frame")
         break
 
+    frameW, frameH = frame.shape[:2] # Get screen width and height
+
     # ---- Detect face & add its position into pts list ----
     # ------------------------------------------------------
     # Horizontal flip (make the laptop as a mirror)
@@ -55,33 +60,41 @@ while (webcam.isOpened()):
     # Remove remaining small holes and speckles caused by lighting/shadows
     # (5, 5) kernel and omega = 0 => work in most lightning 
     gray = cv.GaussianBlur(gray, (5, 5), 0) 
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(40, 40))
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(80, 80))
     if (len(faces) > 0):
         # Capture the closest face to the camera
         # Get top left conner coordinates (fx, fy) 
         # and width, height (fw, fh) of the face
         fx, fy, fw, fh = max(faces, key=lambda r: r[2]*r[3])
-        # Draw face box for debugging
-        cv.rectangle(frame, (fx, fy), (fx+fw, fy+fh), (0, 0, 255), 2)
         # (Sum of x/y coordinates in pixels from top left conner coordinates) 
         # / (No of pixels = 2) 
         # = Middle pixels within a line of x/y coordinates
-        centerX, centerY = fx + fw // 2, fy + fh // 2
+        faceCenterX, faceCenterY = fx + fw // 2, fy + fh // 2
 
         # EMA smoothing
         if ema is None:
-            ema = (centerX, centerY)
+            ema = (faceCenterX, faceCenterY)
         else:
             # (1 - SMOOTH_ALPHA) * current_coordinates + SMOOTH_ALPHA * next_coordinates
             # The lower the SMOOTH_ALPHA, the less adjustment of current_coordinates
-            ema = (int((1 - SMOOTH_ALPHA) * ema[0] + SMOOTH_ALPHA * centerX), 
-                   int((1 - SMOOTH_ALPHA) * ema[1] + SMOOTH_ALPHA * centerY))
+            ema = (int((1 - SMOOTH_ALPHA) * ema[0] + SMOOTH_ALPHA * faceCenterX), 
+                   int((1 - SMOOTH_ALPHA) * ema[1] + SMOOTH_ALPHA * faceCenterY))
 
-        # Append coordinates to list
-        pts.append(ema)
+        # Draw face box for debugging
+        cv.rectangle(frame, (fx, fy), (fx + fw, fy + fh), (0, 0, 255), 2)
+        # Draw face center for debugging
         cv.circle(frame, ema, 6, (255, 0, 0), -1)
 
-    command = determine_command(list(pts), ORIGIN_SLOPE) # Get command
+    # Draw a screen box and its center (let center in the vicinity of the screen)
+    screen_center = ((frameW // 2) + 80, (frameH // 2) - 80)
+    cv.rectangle(frame, (screen_center[0] - DEAD_ZONE, screen_center[1] - DEAD_ZONE),
+                 (screen_center[0] + DEAD_ZONE, screen_center[1] + DEAD_ZONE),
+                 (0, 255, 255), 1)
+    cv.circle(frame, screen_center, 6, (0, 255, 255), 1) # Coordinates (0, 0)
+    
+    # Get command
+    command = determine_command(ema, screen_center, DEAD_ZONE) 
+    
     now = time.time() # Get current time
     if ((now - last_cmd_time) > COOLDOWN_S):
         # Print command every certain time
