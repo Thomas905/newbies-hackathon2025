@@ -68,7 +68,7 @@ class Enemy(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
         image = pygame.image.load(path.join(setting.img_folder,"peashooter_candidate_0.png"))
-        self.image = pygame.transform.scale(image,(60,45))
+        self.image = pygame.transform.scale(image,(50,60))
         self.rect = self.image.get_rect()
         # 随机格子坐标
         self.grid_x = random.randint(0, 5)
@@ -79,17 +79,15 @@ class Enemy(pygame.sprite.Sprite):
         self.out_time = None  # 记录出屏时间
 
     def update_position(self):
-        self.rect.x = self.grid_x * 75
-        self.rect.y = 10 + self.grid_y * 60
+        self.rect.x = 20 + self.grid_x * 75
+        self.rect.y = 5 + self.grid_y * 60
 
     def scroll_with_bg(self, scroll_amount):
-        self.grid_y += scroll_amount // 60  # 每次卷轴移动一格
-        self.update_position()
+        self.rect.y += scroll_amount
 
     def update(self):
-        # 敌人默认不自动移动，只随卷轴移动
-        self.update_position()
-        # 检查是否出屏
+        # Enemy only moves with background scroll (handled externally)
+        # Check if out of screen
         if self.rect.top > HEIGHT:
             if self.out_time is None:
                 self.out_time = time.time()
@@ -155,6 +153,7 @@ bg_img = pygame.transform.scale(bg_img, (WIDTH, HEIGHT))
 bg_y1 = 0
 bg_y2 = -HEIGHT
 BG_SCROLL_SPEED = 60  # 每次滚动的像素
+bg_scroll_speed_per_frame = BG_SCROLL_SPEED / 60  # 每帧滚动像素，假设60fps
 last_scroll_time = time.time()
 
 while running:
@@ -169,23 +168,17 @@ while running:
             if event.key == pygame.K_SPACE:
                 player.shoot()
     
-    # 背景滚动逻辑，每1秒移动一次
-    now = time.time()
-    scroll_amount = 0
-    if now - last_scroll_time >= 1:
-        bg_y1 += BG_SCROLL_SPEED
-        bg_y2 += BG_SCROLL_SPEED
-        scroll_amount = BG_SCROLL_SPEED
-        last_scroll_time = now
-    # 两张图循环
+    # Smooth background scroll by pixel per frame
+    bg_y1 += bg_scroll_speed_per_frame
+    bg_y2 += bg_scroll_speed_per_frame
+    # Two background images loop
     if bg_y1 >= HEIGHT:
         bg_y1 = bg_y2 - HEIGHT
     if bg_y2 >= HEIGHT:
         bg_y2 = bg_y1 - HEIGHT
-    # 敌人随背景卷动
-    if scroll_amount > 0:
-        for enemy in enemies:
-            enemy.scroll_with_bg(scroll_amount)
+    # Enemies move with background scroll (pixel-based)
+    for enemy in enemies:
+        enemy.scroll_with_bg(bg_scroll_speed_per_frame)
     
     # 更新
     all_sprites.update()
