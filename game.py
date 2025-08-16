@@ -11,13 +11,22 @@ pygame.init()
 # Globals & Create sprite groups
 all_sprites = pygame.sprite.Group()
 enemies = pygame.sprite.Group()
-bullets = pygame.sprite.Group()
+bullets_0 = pygame.sprite.Group()
+bullets_1 = pygame.sprite.Group()
+
 playing_mode_set = 0
 
 # Screen settings
 WIDTH = 450
 HEIGHT = 720
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
+# 设置窗口icon
+icon_path = path.join(setting.img_folder, "icon.png")
+if os.path.exists(icon_path):
+    icon_img = pygame.image.load(icon_path)
+    pygame.display.set_icon(icon_img)
+
 pygame.display.set_caption("PVZ")
 detector = HandDetector()
 
@@ -45,8 +54,29 @@ def load_image(name, scale=1):
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        image = pygame.image.load(path.join(setting.img_folder,"hero.png"))
-        self.image = pygame.transform.scale(image,(75,60))
+        gif_path = path.join(setting.img_folder, "hero.gif")
+        self.frames = []
+        try:
+            # 读取GIF所有帧
+            import PIL.Image
+            pil_img = PIL.Image.open(gif_path)
+            for frame in range(0, pil_img.n_frames):
+                pil_img.seek(frame)
+                mode = pil_img.mode
+                frame_img = pil_img.convert("RGBA")
+                raw_str = frame_img.tobytes()
+                size = frame_img.size
+                py_img = pygame.image.frombuffer(raw_str, size, "RGBA")
+                py_img = pygame.transform.scale(py_img, (100, 80))
+                self.frames.append(py_img)
+        except Exception as e:
+            # 失败则用静态图
+            image = pygame.image.load(gif_path)
+            self.frames = [pygame.transform.scale(image, (75, 60))]
+        self.frame_idx = 0
+        self.frame_time = 0
+        self.frame_interval = 100  # 每帧间隔(ms)
+        self.image = self.frames[0]
         self.rect = self.image.get_rect()
         # Initial pixel coordinates, centered
         self.rect.x = 2 * 75
@@ -76,13 +106,20 @@ class Player(pygame.sprite.Sprite):
             if keys[pygame.K_DOWN]:
                 self.rect.y += speed
 
+        # 动画帧切换
+        now = pygame.time.get_ticks()
+        if now - self.frame_time > self.frame_interval:
+            self.frame_idx = (self.frame_idx + 1) % len(self.frames)
+            self.image = self.frames[self.frame_idx]
+            self.frame_time = now
+
         self.rect.clamp_ip(screen.get_rect())
 
     def shoot(self):
-        # 玩家发射大子弹，速度等于卷轴速度，0.5s自毁
+        # 玩家发射子弹，速度等于卷轴速度，0.5s自毁
         bullet = PlayerBullet(self.rect.centerx, self.rect.top, 5)  # 5可替换为卷轴速度
         all_sprites.add(bullet)
-        bullets.add(bullet)
+        bullets_0.add(bullet)  # player bullet group
 
 # Enemy class
 class Enemy(pygame.sprite.Sprite):
@@ -97,7 +134,7 @@ class Enemy(pygame.sprite.Sprite):
         self.rect.x = 20 + self.grid_x * 75
         self.rect.y = 5 + self.grid_y * 60 + int(bg_offset) % 60
         self.speedx = 0
-        self.speedy = speed  # enemy speed (pixels/sec)
+        self.speedY = speed  # enemy speed (pixels/sec)
         self.out_time = None
 
     def update_position(self, bg_offset=0):
@@ -109,7 +146,7 @@ class Enemy(pygame.sprite.Sprite):
 
     def update(self):
         # Enemy moves by its own speed (difficulty)
-        self.rect.y += self.speedy / 60  # move per frame
+        self.rect.y += self.speedY / 60  # move per frame
         # Check if out of screen
         if self.rect.top > HEIGHT:
             if self.out_time is None:
@@ -122,11 +159,12 @@ class Enemy(pygame.sprite.Sprite):
         # 敌人子弹，速度为bullet_speed，伤害类型1
         bullet = EnemyBullet(self.rect.centerx, self.rect.bottom, bullet_speed)
         all_sprites.add(bullet)
-        bullets.add(bullet)
+        bullets_1.add(bullet)
     def try_shoot(self, bullet_speed, now):
+        shoot_interval = 2  # seconds
         if not hasattr(self, 'last_shoot_time'):
             self.last_shoot_time = now
-        if now - self.last_shoot_time >= 3:
+        if now - self.last_shoot_time >= shoot_interval:
             self.shoot(bullet_speed)
             self.last_shoot_time = now
 
@@ -146,7 +184,7 @@ class Peashooter(Enemy):
         # 敌人子弹，速度为bullet_speed，伤害类型1
         bullet = EnemyBullet(self.rect.centerx, self.rect.bottom, bullet_speed)
         all_sprites.add(bullet)
-        bullets.add(bullet)
+        bullets_1.add(bullet)
     def try_shoot(self, bullet_speed, now):
         if not hasattr(self, 'last_shoot_time'):
             self.last_shoot_time = now
@@ -156,7 +194,7 @@ class Peashooter(Enemy):
 
 # Bullet class
 class Bullet(pygame.sprite.Sprite):
-    def __init__(self, x, y, speedx, speedy, damage_type, color, size=(5, 5)):
+    def __init__(self, x, y, speedx, speedY, damage_type, color, size=(10, 10)):
         super().__init__()
         self.image = pygame.Surface(size)
         self.image.fill(color)
@@ -164,28 +202,48 @@ class Bullet(pygame.sprite.Sprite):
         self.rect.centerx = x
         self.rect.top = y
         self.speedx = speedx
-        self.speedy = speedy
+        self.speedY = speedY
         self.damage_type = damage_type  # 0: 对敌, 1: 对玩家
 
     def update(self):
         self.rect.x += self.speedx
-        self.rect.y += self.speedy
+        self.rect.y += self.speedY
         if self.rect.top > HEIGHT or self.rect.bottom < 0 or self.rect.right < 0 or self.rect.left > WIDTH:
             self.kill()
 
 class PlayerBullet(Bullet):
-    def __init__(self, x, y, speedy):
-        super().__init__(x, y, 0, -speedy, damage_type=0, color=GREEN, size=(10, 10))
+    def __init__(self, x, y, speedY):
+        # 优先用PB01.gif
+        img_path = path.join(setting.img_folder, "PB01.gif")
+        if os.path.exists(img_path):
+            size = 16
+            image = pygame.image.load(img_path).convert_alpha()
+            image = pygame.transform.scale(image, (size, size))
+            super().__init__(x, y, 0, -speedY, damage_type=0, color=GREEN, size=(size, size))
+            self.image = image
+            self.rect = self.image.get_rect()
+            self.rect.centerx = x
+            self.rect.top = y
+        else:
+            super().__init__(x, y, 0, -speedY, damage_type=0, color=GREEN, size=(size, size))
         self.spawn_time = time.time()
 
-    def update(self):
-        super().update()
-        if time.time() - self.spawn_time > 0.5:
-            self.kill()
 
 class EnemyBullet(Bullet):
-    def __init__(self, x, y, speedy):
-        super().__init__(x, y, 0, speedy, damage_type=1, color=RED, size=(9, 9))
+    def __init__(self, x, y, speedY):
+        # 优先用PB11.gif
+        size = 21
+        img_path = path.join(setting.img_folder, "PB11.gif")
+        if os.path.exists(img_path):
+            image = pygame.image.load(img_path).convert_alpha()
+            image = pygame.transform.scale(image, (size, size))
+            super().__init__(x, y, 0, speedY, damage_type=1, color=RED, size=(size, size))
+            self.image = image
+            self.rect = self.image.get_rect()
+            self.rect.centerx = x
+            self.rect.top = y
+        else:
+            super().__init__(x, y, 0, speedY, damage_type=1, color=RED, size=(9, 9))
 
 class GameArea:
     def layout_game_area(self):
@@ -234,6 +292,24 @@ class GameArea:
         shoot_cooldown = 200
         last_shoot_time = 0
 
+        effects = []  # 用于存储爆炸视觉效果
+
+        # 预加载PeaBulletHit.gif的第一帧
+        pea_hit_img = None
+        pea_hit_path = path.join(setting.img_folder, "PeaBulletHit.gif")
+        if os.path.exists(pea_hit_path):
+            try:
+                import PIL.Image
+                pil_img = PIL.Image.open(pea_hit_path)
+                pil_img.seek(0)
+                frame_img = pil_img.convert("RGBA")
+                raw_str = frame_img.tobytes()
+                size = frame_img.size
+                pea_hit_img = pygame.image.frombuffer(raw_str, size, "RGBA")
+                pea_hit_img = pygame.transform.scale(pea_hit_img, (40, 40))
+            except Exception:
+                pea_hit_img = None
+
         while running:
             # Keep loop running at the right speed
             clock.tick(60)
@@ -265,7 +341,7 @@ class GameArea:
                 bg_scroll_speed_per_frame = scroll_speed // 60
                 # Update speed for all existing enemies
                 for enemy in enemies:
-                    enemy.speedy = enemy_speed
+                    enemy.speedY = enemy_speed
                 last_difficulty_time = now
 
             # Smooth background scroll by pixel per frame
@@ -291,8 +367,8 @@ class GameArea:
                         enemies.add(enemy)
                 last_enemy_check_time = now
             
-            # Enemies shoot bullets
-            bullet_speed = bg_scroll_speed_per_frame * 3  # 3 times of the scroll speed
+            # Enemies shoot bullets_1
+            bullet_speed = bg_scroll_speed_per_frame * 5  # 3 times of the scroll speed
             now = time.time()
             for enemy in enemies:
                 enemy.try_shoot(bullet_speed, 0.1 * random.randrange(0, 10) + now)
@@ -300,28 +376,48 @@ class GameArea:
             all_sprites.update()
 
             # 检查敌人子弹击中玩家
-            for bullet in bullets:
-                if getattr(bullet, 'damage_type', None) == 1:  # 敌人子弹
-                    if player.rect.colliderect(bullet.rect):
-                        player.hp -= 1
-                        bullet.kill()
-                        if player.hp <= 0:
-                            running = False
+            for bullet in list(bullets_1):
+                if player.rect.colliderect(bullet.rect):
+                    player.hp -= 1
+                    # 添加爆炸视觉效果
+                    if pea_hit_img:
+                        effect_rect = pea_hit_img.get_rect(center=bullet.rect.center)
+                        effects.append({
+                            "image": pea_hit_img,
+                            "rect": effect_rect,
+                            "start_time": time.time()
+                        })
+                    bullet.kill()
+                    if player.hp <= 0:
+                        running = False
 
             # 检查玩家子弹击中敌人
-            hits = pygame.sprite.groupcollide(enemies, bullets, True, False)
+            hits = pygame.sprite.groupcollide(enemies, bullets_0, True, False)
             for enemy, hit_bullets in hits.items():
                 for bullet in hit_bullets:
-                    if getattr(bullet, 'damage_type', None) == 0:  # 玩家子弹
-                        score += 10
-                        bullet.kill()  # 玩家子弹击中敌人后销毁
-            
+                    score += 10
+                    # 添加爆炸视觉效果
+                    if pea_hit_img:
+                        effect_rect = pea_hit_img.get_rect(center=bullet.rect.center)
+                        effects.append({
+                            "image": pea_hit_img,
+                            "rect": effect_rect,
+                            "start_time": time.time()
+                        })
+                    bullet.kill()  # 玩家子弹击中敌人后销毁
+
             # Render
             screen.fill(BLACK)
             screen.blit(bg_img, (0, bg_y1))
             screen.blit(bg_img, (0, bg_y2))
             all_sprites.draw(screen)
-            
+
+            # 渲染爆炸视觉效果
+            now = time.time()
+            effects[:] = [e for e in effects if now - e["start_time"] < 0.1]
+            for e in effects:
+                screen.blit(e["image"], e["rect"])
+
             # Display score
             score_text = font.render(f"score: {score}", True, WHITE)
             screen.blit(score_text, (10, 10))

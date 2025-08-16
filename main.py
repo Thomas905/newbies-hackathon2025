@@ -80,7 +80,7 @@ def layout_menu():
         last_grab = detector.is_grab
 
         for i, btn in enumerate(buttons):
-            basic_button(btn, 125, 250 + i*120, selected == i)
+            basic_button(btn, 125, 250 + i * 120, selected == i)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -108,7 +108,7 @@ def layout_menu():
         if show_rage_quit_msg:
             elapsed = pygame.time.get_ticks() - rage_quit_timer
             if elapsed < 2000:
-                msg = font.render("😡 Rage quit detected!", True, (255, 0, 0))
+                msg = font.render("Rage quit detected!", True, (255, 0, 0))
                 screen.blit(msg, (SCREEN_WIDTH // 2 - msg.get_width() // 2, 100))
             else:
                 show_rage_quit_msg = False
