@@ -72,7 +72,7 @@ class HandDetector:
                 points = np.array(points, dtype=np.int32)
                 # bounding rect center
                 x, y, w_box, h_box = cv2.boundingRect(points)
-                center = (x // 2, y // 2)
+                center = (x // 2, y - 100 // 2)
                 self.hand_center = center
                 idx_tip = hand_landmarks.landmark[8]   # Index tip
                 thumb_tip = hand_landmarks.landmark[4] # Pouce tip
