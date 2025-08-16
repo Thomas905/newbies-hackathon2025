@@ -2,15 +2,13 @@ import pygame
 import random
 import os
 import os.path as path
-import setting
 import time
+
+from support import *
 from hand_detection import HandDetector
-pygame.init()
 
 # Screen settings
-WIDTH = 450
-HEIGHT = 720
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("PVZ")
 detector = HandDetector()
 
@@ -21,18 +19,19 @@ RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 
+bg_scroll_speed_per_frame = 1
 # Load image
 def load_image(name, scale=1):
     img = pygame.Surface((50, 40))
     img.fill(BLUE if name == "player" else RED)
     return img
 
-
+# Classes
 # Player sprite
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        image = pygame.image.load(path.join(setting.img_folder,"hero.png"))
+        image = pygame.image.load(path.join(IMG_FOLDER,"hero.png"))
         self.image = pygame.transform.scale(image,(75,60))
         self.rect = self.image.get_rect()
         # Initial pixel coordinates, centered
@@ -52,16 +51,30 @@ class Player(pygame.sprite.Sprite):
             self.rect.centerx = hand_x
             self.rect.centery = hand_y
 
-    def shoot(self):
-        bullet = Bullet(self.rect.centerx, self.rect.top, 5)
-        all_sprites.add(bullet)
-        bullets.add(bullet)
+    def shoot(self, bullet_type='normal'):
+        now = time.time()
+        if now - self.last_shoot_time < 0.3:
+            self.cd_hint = True
+            return
+        self.cd_hint = False
+        self.last_shoot_time = now
+        if bullet_type == 'big':
+            # 50x50 bullet, center y = player center y - 60
+            bullet = PlayerBullet(
+                self.rect.centerx,
+                self.rect.centery - 120,
+                bg_scroll_speed_per_frame,
+                color=GREEN
+            )
+        else:
+            # fallback to default bullet
+            bullet = Bullet(self.rect.centerx, self.rect.top, -bg_scroll_speed_per_frame, color=GREEN)
 
 # Enemy class
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, speed=0, bg_offset=0):
         super().__init__()
-        image = pygame.image.load(path.join(setting.img_folder,"peashooter_candidate_0.png"))
+        image = pygame.image.load(path.join(IMG_FOLDER,"peashooter_candidate_0.png"))
         self.image = pygame.transform.scale(image,(50,60))
         self.rect = self.image.get_rect()
         # Random grid position
@@ -84,7 +97,7 @@ class Enemy(pygame.sprite.Sprite):
         # Enemy moves by its own speed (difficulty)
         self.rect.y += self.speedy / 60  # move per frame
         # Check if out of screen
-        if self.rect.top > HEIGHT:
+        if self.rect.top > SCREEN_HEIGHT:
             if self.out_time is None:
                 self.out_time = time.time()
             elif time.time() - self.out_time > 1:
@@ -99,7 +112,7 @@ class Enemy(pygame.sprite.Sprite):
 class Peashooter(Enemy):
     def __init__(self, speed=0, bg_offset=0):
         super().__init__(speed=speed, bg_offset=bg_offset)
-        image = pygame.image.load(path.join(setting.img_folder,"peashooter_candidate_0.png"))
+        image = pygame.image.load(path.join(IMG_FOLDER,"peashooter_candidate_0.png"))
         self.image = pygame.transform.scale(image,(50,60))
         self.rect = self.image.get_rect()
         # Set random position (like Enemy)
@@ -132,7 +145,7 @@ class Bullet(pygame.sprite.Sprite):
     def update(self):
         self.rect.y += self.speedy
         # Destroy automatically if out of screen
-        if self.rect.top > HEIGHT or self.rect.bottom < 0:
+        if self.rect.top > SCREEN_HEIGHT or self.rect.bottom < 0:
             self.kill()
 
 class PlayerBullet(Bullet):
@@ -151,7 +164,7 @@ class PlayerBullet(Bullet):
         if time.time() - self.spawn_time > 0.5:
             self.kill()
         # Still destroy if out of screen
-        if self.rect.top > HEIGHT or self.rect.bottom < 0:
+        if self.rect.top > SCREEN_HEIGHT or self.rect.bottom < 0:
             self.kill()
 
 
@@ -181,10 +194,10 @@ class GameArea:
         running = True
         import time
         # Load background image
-        bg_img = pygame.image.load(path.join(setting.img_folder, "background2.png")).convert()
-        bg_img = pygame.transform.scale(bg_img, (WIDTH, HEIGHT))
+        bg_img = pygame.image.load(path.join(IMG_FOLDER, "background2.png")).convert()
+        bg_img = pygame.transform.scale(bg_img, (SCREEN_WIDTH, SCREEN_HEIGHT))
         bg_y1 = 0
-        bg_y2 = -HEIGHT
+        bg_y2 = -SCREEN_HEIGHT
         BG_SCROLL_SPEED = 60  # pixels per scroll
 
         # --- Difficulty and enemy refresh parameters ---
@@ -242,10 +255,10 @@ class GameArea:
             bg_y1 += bg_scroll_speed_per_frame
             bg_y2 += bg_scroll_speed_per_frame
             # Two background images loop
-            if bg_y1 >= HEIGHT:
-                bg_y1 = bg_y2 - HEIGHT
-            if bg_y2 >= HEIGHT:
-                bg_y2 = bg_y1 - HEIGHT
+            if bg_y1 >= SCREEN_HEIGHT:
+                bg_y1 = bg_y2 - SCREEN_HEIGHT
+            if bg_y2 >= SCREEN_HEIGHT:
+                bg_y2 = bg_y1 - SCREEN_HEIGHT
             # Enemies move with background scroll (pixel-based)
             for enemy in enemies:
                 enemy.scroll_with_bg(bg_scroll_speed_per_frame)
@@ -308,6 +321,13 @@ class GameArea:
             # Display hp
             hp_text = font.render(f"hp: {player.hp}", True, WHITE)
             screen.blit(hp_text, (10, 50))
-            
+                # Show "CD" above player if in cooldown
+
+        if getattr(player, 'cd_hint', False):
+            cd_text = font.render("CD", True, RED)
+            cd_x = player.rect.centerx - cd_text.get_width() // 2
+            cd_y = player.rect.top - cd_text.get_height() - 5
+            screen.blit(cd_text, (cd_x, cd_y))
+
             # Refresh screen
             pygame.display.flip()

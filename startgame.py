@@ -1,18 +1,18 @@
-from hand_detection import HandDetector 
-from test import GameArea
 import pygame
+
+from hand_detection import HandDetector
+from main import *
+from support import *
 
 pygame.init()
 
 # Globals Variables
-SCREEN_WIDTH = 450
-SCREEN_HEIGHT = 720
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("NewBies Game")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 50)
 
-##Colors
+# Colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 40, 0)
