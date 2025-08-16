@@ -141,7 +141,6 @@ class Player(pygame.sprite.Sprite):
         self.rect.clamp_ip(screen.get_rect())
 
     def shoot(self):
-        # 玩家发射子弹，速度等于卷轴速度，0.5s自毁
         bullet = PlayerBullet(self.rect.centerx, self.rect.top, 5)
         all_sprites.add(bullet)
         bullets_0.add(bullet)
@@ -337,15 +336,20 @@ class GameArea:
             clock.tick(60)
     
             detector.update()
+
+            current_time = pygame.time.get_ticks()
             
             # Handle input events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                if event.type == pygame.KEYDOWN and ControlMode.KEY:
+                    if event.key == pygame.K_SPACE:
+                        if current_time - last_shoot_time > shoot_cooldown:
+                            player.shoot()
+                            last_shoot_time = current_time
             
-            current_time = pygame.time.get_ticks()
-
-            if detector.is_grab:
+            if ControlMode.HAND and detector.is_grab:
                 if current_time - last_shoot_time > shoot_cooldown:
                     player.shoot()
                     last_shoot_time = current_time
