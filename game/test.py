@@ -32,34 +32,31 @@ class Player(pygame.sprite.Sprite):
         image = pygame.image.load(path.join(setting.img_folder,"hero.png"))
         self.image = pygame.transform.scale(image,(75,60))
         self.rect = self.image.get_rect()
-        # 网格参数
-        self.grid_x = 2  # 初始在第3列
-        self.grid_y = 6  # 初始在第7行（中间11行的中间）
-        self.update_position()
+        # 初始像素坐标，居中
+        self.rect.x = 2 * 75
+        self.rect.y = 30 + 6 * 60
         self.health = 100
-
-    def update_position(self):
-        self.rect.x = self.grid_x * 75
-        self.rect.y = 30 + self.grid_y * 60
 
     def update(self):
         keys = pygame.key.get_pressed()
-        moved = False
-        if keys[pygame.K_LEFT] and self.grid_x > 0:
-            self.grid_x -= 1
-            moved = True
-        if keys[pygame.K_RIGHT] and self.grid_x < 5:
-            self.grid_x += 1
-            moved = True
-        # 主角只能在中间11行（grid_y = 0 ~ 10）移动
-        if keys[pygame.K_UP] and self.grid_y > 0:
-            self.grid_y -= 1
-            moved = True
-        if keys[pygame.K_DOWN] and self.grid_y < 10:
-            self.grid_y += 1
-            moved = True
-        if moved:
-            self.update_position()
+        speed = 5
+        if keys[pygame.K_LEFT]:
+            self.rect.x -= speed
+        if keys[pygame.K_RIGHT]:
+            self.rect.x += speed
+        if keys[pygame.K_UP]:
+            self.rect.y -= speed
+        if keys[pygame.K_DOWN]:
+            self.rect.y += speed
+        # 限制移动范围
+        if self.rect.x < -20:
+            self.rect.x = -20
+        if self.rect.x > 390:
+            self.rect.x = 390
+        if self.rect.y < 30:
+            self.rect.y = 30
+        if self.rect.y > 650:
+            self.rect.y = 650
 
     def shoot(self):
         bullet = Bullet(self.rect.centerx, self.rect.top)
@@ -100,7 +97,7 @@ class Enemy(pygame.sprite.Sprite):
                 self.kill()
         else:
             self.out_time = None
-'''
+
 class Peashooter(Enemy):
     def __init__(self):
         super().__init__()
@@ -128,7 +125,7 @@ class Bullet(pygame.sprite.Sprite):
         # 如果子弹飞出屏幕顶部，则删除
         if self.rect.bottom < 0:
             self.kill()
-'''
+
 # 创建精灵组
 all_sprites = pygame.sprite.Group()
 enemies = pygame.sprite.Group()
@@ -162,7 +159,7 @@ last_scroll_time = time.time()
 
 while running:
     # 保持循环以正确的速度运行
-    clock.tick(12)
+    clock.tick(60)
     
     # 处理输入事件
     for event in pygame.event.get():
@@ -215,11 +212,11 @@ while running:
     all_sprites.draw(screen)
     
     # 显示分数
-    score_text = font.render(f"分数: {score}", True, WHITE)
+    score_text = font.render(f"score: {score}", True, WHITE)
     screen.blit(score_text, (10, 10))
     
     # 显示生命值
-    health_text = font.render(f"生命: {player.health}", True, WHITE)
+    health_text = font.render(f"hp: {player.health}", True, WHITE)
     screen.blit(health_text, (10, 50))
     
     # 刷新屏幕
