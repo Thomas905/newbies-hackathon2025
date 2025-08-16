@@ -7,38 +7,38 @@ import time
 from hand_detection import HandDetector
 pygame.init()
 
-# 屏幕设置
+# Screen settings
 WIDTH = 450
 HEIGHT = 720
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("PVZ")
 detector = HandDetector()
 
-# 颜色定义
+# Color definitions
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 
-# 加载图像
+# Load image
 def load_image(name, scale=1):
     img = pygame.Surface((50, 40))
     img.fill(BLUE if name == "player" else RED)
     return img
 
 
-# 玩家精灵
+# Player sprite
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
         image = pygame.image.load(path.join(setting.img_folder,"hero.png"))
         self.image = pygame.transform.scale(image,(75,60))
         self.rect = self.image.get_rect()
-        # 初始像素坐标，居中
+        # Initial pixel coordinates, centered
         self.rect.x = 2 * 75
         self.rect.y = 30 + 8 * 60
-        self.health = 100
+        self.hp = 5
 
     def update(self):
         detector.update()
@@ -55,7 +55,7 @@ class Player(pygame.sprite.Sprite):
         all_sprites.add(bullet)
         bullets.add(bullet)
 
-# 敌人类
+# Enemy class
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, speed=0, bg_offset=0):
         super().__init__()
@@ -90,6 +90,23 @@ class Enemy(pygame.sprite.Sprite):
         else:
             self.out_time = None
     def shoot(self, bullet_speed):
+        pass
+    def try_shoot(self, bullet_speed, now):
+        pass
+
+class Peashooter(Enemy):
+    def __init__(self, speed=0, bg_offset=0):
+        super().__init__(speed=speed, bg_offset=bg_offset)
+        image = pygame.image.load(path.join(setting.img_folder,"peashooter_candidate_0.png"))
+        self.image = pygame.transform.scale(image,(50,60))
+        self.rect = self.image.get_rect()
+        # Set random position (like Enemy)
+        self.grid_x = random.randint(0, 5)
+        self.grid_y = random.randint(-6, 0)
+        self.rect.x = 20 + self.grid_x * 75
+        self.rect.y = 5 + self.grid_y * 60
+
+    def shoot(self, bullet_speed):
         bullet = Bullet(self.rect.centerx, self.rect.bottom, bullet_speed, color=RED)
         all_sprites.add(bullet)
         bullets.add(bullet)
@@ -99,18 +116,8 @@ class Enemy(pygame.sprite.Sprite):
         if now - self.last_shoot_time >= 3:
             self.shoot(bullet_speed)
             self.last_shoot_time = now
-class Peashooter(Enemy):
-    def __init__(self):
-        super().__init__()
-        image = pygame.image.load(path.join(setting.img_folder,"peashooter_candidate_0.png"))
-        self.image = pygame.transform.scale(image,(75,60))
-        self.rect = self.image.get_rect()
-        self.rect.x = random.randrange(WIDTH - self.rect.width)
-        self.rect.y = random.randrange(-100, -40)
-        self.speedy = random.randrange(1, 5)
-        self.speedx = random.randrange(-2, 2)
 
-# 子弹类
+# Bullet class
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, x, y, speedy, color=GREEN):
         super().__init__()
@@ -122,42 +129,42 @@ class Bullet(pygame.sprite.Sprite):
         self.speedy = speedy
     def update(self):
         self.rect.y += self.speedy
-        # 超出屏幕自动销毁
+        # Destroy automatically if out of screen
         if self.rect.top > HEIGHT or self.rect.bottom < 0:
             self.kill()
 
 
-# 创建精灵组
+# Create sprite groups
 all_sprites = pygame.sprite.Group()
 enemies = pygame.sprite.Group()
 bullets = pygame.sprite.Group()
 
-
 class GameArea:
     def layout_game_area(self):
-        # 创建玩家
+        # Create player
         player = Player()
         all_sprites.add(player)
 
-        # 创建敌人
+        # Create enemies
         for i in range(4):
-            enemy = Enemy()
-            all_sprites.add(enemy)
+            enemy = Peashooter()
+            all_sprites.add(enemy)  # <-- add enemy to all_sprites
             enemies.add(enemy)
 
-        # 分数
+        # Score
         score = 0
         font = pygame.font.SysFont(None, 36)
 
-        # 游戏循环
+        # Game loop
         clock = pygame.time.Clock()
         running = True
-        # 加载背景图像
+        import time
+        # Load background image
         bg_img = pygame.image.load(path.join(setting.img_folder, "background2.png")).convert()
         bg_img = pygame.transform.scale(bg_img, (WIDTH, HEIGHT))
         bg_y1 = 0
         bg_y2 = -HEIGHT
-        BG_SCROLL_SPEED = 60  # 每次滚动的像素
+        BG_SCROLL_SPEED = 60  # pixels per scroll
 
         # --- Difficulty and enemy refresh parameters ---
         BASE_SCROLL_SPEED = 60  # initial scroll speed (pixels/sec)
@@ -175,18 +182,14 @@ class GameArea:
         last_difficulty_time = start_time
         last_enemy_check_time = start_time
         bg_scroll_speed_per_frame = scroll_speed / 60
-        '''
-        shoot_cooldown = 200
-        last_shoot_time = 0
-        '''
 
         while running:
-            # 保持循环以正确的速度运行
+            # Keep loop running at the right speed
             clock.tick(60)
-
+    
             detector.update()
             
-            # 处理输入事件
+            # Handle input events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -222,23 +225,23 @@ class GameArea:
             # Enemies move with background scroll (pixel-based)
             for enemy in enemies:
                 enemy.scroll_with_bg(bg_scroll_speed_per_frame)
-
+    
             # --- Enemy supplement check every ENEMY_CHECK_INTERVAL seconds ---
             if now - last_enemy_check_time >= ENEMY_CHECK_INTERVAL:
                 missing = max_enemies - len(enemies)
                 for _ in range(missing):
-                    if random.random() < 0.5:
-                        # 新敌人y坐标与当前背景偏移对齐
-                        enemy = Enemy(speed=enemy_speed, bg_offset=bg_y1)
+                    if random.random() < 0.8:
+                        # New enemy y coordinate aligns with current background offset
+                        enemy = Peashooter(speed=enemy_speed, bg_offset=bg_y1)
                         all_sprites.add(enemy)
                         enemies.add(enemy)
                 last_enemy_check_time = now
             
-            # 敌人发射子弹
-            bullet_speed = bg_scroll_speed_per_frame * 2  # 卷轴速度两倍
+            # Enemies shoot bullets
+            bullet_speed = bg_scroll_speed_per_frame * 3  # 3 times of the scroll speed
             now = time.time()
             for enemy in enemies:
-                enemy.try_shoot(bullet_speed, now)
+                enemy.try_shoot(bullet_speed, 0.1 * random.randrange(0, 10) + now)
             # Update
             all_sprites.update()
 
@@ -246,38 +249,41 @@ class GameArea:
             for bullet in bullets:
                 if bullet.image.get_at((0,0)) == RED:
                     if player.rect.colliderect(bullet.rect):
-                        player.health -= 10
+                        player.hp -= 1
                         bullet.kill()
-
-            # Check if bullet hits enemy (only allow player子弹, 这里假设player子弹为GREEN)
+                        if player.hp <= 0:
+                            running = False
+            '''
+            # Check if bullet hits enemy (only allow player bullets, here assume player bullet is GREEN)
             hits = pygame.sprite.groupcollide(enemies, bullets, True, False)
             for enemy, hit_bullets in hits.items():
-                # 只有绿色子弹才算击中敌人
+                # Only green bullets count as hitting the enemy
                 for bullet in hit_bullets:
                     if bullet.image.get_at((0,0)) == GREEN:
                         score += 10
                         bullet.kill()
-            
+            '''
+
             # No collision damage between enemies and player
             # hits = pygame.sprite.spritecollide(player, enemies, False)
             # if hits:
-            #     player.health -= 1
-            #     if player.health <= 0:
+            #     player.hp -= 1
+            #     if player.hp <= 0:
             #         running = False
             
-            # 渲染
+            # Render
             screen.fill(BLACK)
             screen.blit(bg_img, (0, bg_y1))
             screen.blit(bg_img, (0, bg_y2))
             all_sprites.draw(screen)
             
-            # 显示分数
+            # Display score
             score_text = font.render(f"score: {score}", True, WHITE)
             screen.blit(score_text, (10, 10))
             
-            # 显示生命值
-            health_text = font.render(f"hp: {player.health}", True, WHITE)
-            screen.blit(health_text, (10, 50))
+            # Display hp
+            hp_text = font.render(f"hp: {player.hp}", True, WHITE)
+            screen.blit(hp_text, (10, 50))
             
-            # 刷新屏幕
+            # Refresh screen
             pygame.display.flip()
