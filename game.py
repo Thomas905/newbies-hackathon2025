@@ -7,6 +7,17 @@ import time
 from hand_detection import HandDetector
 from support import get_mode, set_mode, ControlMode
 pygame.init()
+pygame.mixer.init()
+
+# 音乐与音效文件名变量
+BGM_MENU = path.join(setting.snd_folder, "bgm_menu.mp3")
+BGM_GAME = path.join(setting.snd_folder, "bgm_game.mp3")
+# SFX_SHOOT = path.join(setting.snd_folder, "shoot.mp3")
+SFX_START = path.join(setting.snd_folder, "start.mp3")
+SFX_HIT = path.join(setting.snd_folder, "hit.mp3")
+SFX_MENU_ENTER = path.join(setting.snd_folder, "menu_enter.mp3")
+SFX_MENU_SWITCH_ON = path.join(setting.snd_folder, "menu_switch_on.mp3")
+SFX_MENU_SWITCH_OFF = path.join(setting.snd_folder, "menu_switch_off.mp3")
 
 # Globals & Create sprite groups
 all_sprites = pygame.sprite.Group()
@@ -49,6 +60,20 @@ def load_image(name, scale=1):
     img.fill(BLUE if name == "player" else RED)
     return img
 
+
+def play_bgm(bgm_path):
+    pygame.mixer.music.stop()
+    if os.path.exists(bgm_path):
+        pygame.mixer.music.load(bgm_path)
+        pygame.mixer.music.play(-1)  # 循环播放
+
+def play_sfx(sfx_path):
+    if os.path.exists(sfx_path):
+        try:
+            sound = pygame.mixer.Sound(sfx_path)
+            sound.play()
+        except Exception:
+            pass
 
 # Player sprite
 class Player(pygame.sprite.Sprite):
@@ -117,9 +142,10 @@ class Player(pygame.sprite.Sprite):
 
     def shoot(self):
         # 玩家发射子弹，速度等于卷轴速度，0.5s自毁
-        bullet = PlayerBullet(self.rect.centerx, self.rect.top, 5)  # 5可替换为卷轴速度
+        bullet = PlayerBullet(self.rect.centerx, self.rect.top, 5)
         all_sprites.add(bullet)
-        bullets_0.add(bullet)  # player bullet group
+        bullets_0.add(bullet)
+        # play_sfx(SFX_SHOOT)  # 子弹射出音效
 
 # Enemy class
 class Enemy(pygame.sprite.Sprite):
@@ -156,17 +182,10 @@ class Enemy(pygame.sprite.Sprite):
         else:
             self.out_time = None
     def shoot(self, bullet_speed):
-        # 敌人子弹，速度为bullet_speed，伤害类型1
         bullet = EnemyBullet(self.rect.centerx, self.rect.bottom, bullet_speed)
         all_sprites.add(bullet)
         bullets_1.add(bullet)
-    def try_shoot(self, bullet_speed, now):
-        shoot_interval = 2  # seconds
-        if not hasattr(self, 'last_shoot_time'):
-            self.last_shoot_time = now
-        if now - self.last_shoot_time >= shoot_interval:
-            self.shoot(bullet_speed)
-            self.last_shoot_time = now
+        # play_sfx(SFX_SHOOT)  # 敌人射击也可用同一音效
 
 class Peashooter(Enemy):
     def __init__(self, speed=0, bg_offset=0):
@@ -181,16 +200,17 @@ class Peashooter(Enemy):
         self.rect.y = 5 + self.grid_y * 60
 
     def shoot(self, bullet_speed):
-        # 敌人子弹，速度为bullet_speed，伤害类型1
         bullet = EnemyBullet(self.rect.centerx, self.rect.bottom, bullet_speed)
         all_sprites.add(bullet)
         bullets_1.add(bullet)
     def try_shoot(self, bullet_speed, now):
         if not hasattr(self, 'last_shoot_time'):
             self.last_shoot_time = now
+            # play_sfx(SFX_SHOOT)  # 敌人射击也可用同一音效
         if now - self.last_shoot_time >= 3:
             self.shoot(bullet_speed)
             self.last_shoot_time = now
+            
 
 # Bullet class
 class Bullet(pygame.sprite.Sprite):
@@ -247,6 +267,8 @@ class EnemyBullet(Bullet):
 
 class GameArea:
     def layout_game_area(self):
+        play_bgm(BGM_GAME)  # 进入游戏切换BGM
+        play_sfx(SFX_START)
         # Create player
         player = Player()
         all_sprites.add(player)
@@ -387,6 +409,7 @@ class GameArea:
                             "rect": effect_rect,
                             "start_time": time.time()
                         })
+                    play_sfx(SFX_HIT)  # 播放击中音效
                     bullet.kill()
                     if player.hp <= 0:
                         running = False
@@ -396,7 +419,6 @@ class GameArea:
             for enemy, hit_bullets in hits.items():
                 for bullet in hit_bullets:
                     score += 10
-                    # 添加爆炸视觉效果
                     if pea_hit_img:
                         effect_rect = pea_hit_img.get_rect(center=bullet.rect.center)
                         effects.append({
@@ -404,7 +426,8 @@ class GameArea:
                             "rect": effect_rect,
                             "start_time": time.time()
                         })
-                    bullet.kill()  # 玩家子弹击中敌人后销毁
+                    play_sfx(SFX_HIT)  # 播放击中音效
+                    bullet.kill()
 
             # Render
             screen.fill(BLACK)
@@ -429,6 +452,8 @@ class GameArea:
             # Refresh screen
             pygame.display.flip()
 
+        play_bgm(BGM_MENU)  # 游戏退出切回菜单BGM
+
 class Settings:
     def __init__(self):
         self.options = ["Hand Tracking", "Arrow Keys"]
@@ -439,24 +464,25 @@ class Settings:
     def handle_navigation_key(self):
         keys = pygame.key.get_pressed()
         current_time = pygame.time.get_ticks()
-
         if keys[pygame.K_UP] and current_time - self.last_move_time > self.cooldown:
             self.selected_index = (self.selected_index - 1) % len(self.options)
             self.last_move_time = current_time
+            play_sfx(SFX_MENU_SWITCH_ON)
         elif keys[pygame.K_DOWN] and current_time - self.last_move_time > self.cooldown:
             self.selected_index = (self.selected_index + 1) % len(self.options)
             self.last_move_time = current_time
-
+            play_sfx(SFX_MENU_SWITCH_OFF)
     def handle_navigation_hand(self):
         current_time = pygame.time.get_ticks()
         if detector.movement and detector.hand_center:
             if current_time - self.last_move_time > self.cooldown:
                 if detector.movement == "Down":
                     self.selected_index = (self.selected_index + 1) % len(self.options)
+                    play_sfx(SFX_MENU_SWITCH_OFF)
                 elif detector.movement == "Up":
                     self.selected_index = (self.selected_index - 1) % len(self.options)
+                    play_sfx(SFX_MENU_SWITCH_ON)
                 self.last_move_time = current_time
-
     def handle_grab(self):
         if detector.is_grab:
             selected = self.options[self.selected_index]
@@ -469,6 +495,7 @@ class Settings:
         return False
 
     def layout_setting(self):
+        play_sfx(SFX_MENU_ENTER)
         pygame.display.set_caption("Settings")
         clock = pygame.time.Clock()
         running = True
