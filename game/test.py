@@ -58,8 +58,19 @@ class Player(pygame.sprite.Sprite):
         if self.rect.y > 650:
             self.rect.y = 650
 
-    def shoot(self):
-        bullet = Bullet(self.rect.centerx, self.rect.top)
+    def shoot(self, bullet_type='normal'):
+        # Shoot different types of bullets by bullet_type
+        if bullet_type == 'big':
+            # 50x50 bullet, center y = player center y - 60
+            bullet = PlayerBullet(
+                self.rect.centerx,
+                self.rect.centery - 60,
+                -bg_scroll_speed_per_frame,
+                color=GREEN
+            )
+        else:
+            # fallback to default bullet
+            bullet = Bullet(self.rect.centerx, self.rect.top, -bg_scroll_speed_per_frame, color=GREEN)
         all_sprites.add(bullet)
         bullets.add(bullet)
 
@@ -141,6 +152,15 @@ class Bullet(pygame.sprite.Sprite):
         if self.rect.top > HEIGHT or self.rect.bottom < 0:
             self.kill()
 
+class PlayerBullet(Bullet):
+    def __init__(self, x, y, speedy, color=GREEN):
+        super().__init__(x, y, speedy, color)
+        self.image = pygame.Surface((50, 50))
+        self.image.fill(color)
+        self.rect = self.image.get_rect()
+        self.rect.centerx = x
+        self.rect.centery = y
+
 
 # Create sprite groups
 all_sprites = pygame.sprite.Group()
@@ -197,11 +217,11 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        '''
+        
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                player.shoot()
-        '''
+                player.shoot('big')  # 按空格射出大子弹
+        
     # --- Difficulty increases every DIFFICULTY_INTERVAL seconds ---
     now = time.time()
     if now - last_difficulty_time >= DIFFICULTY_INTERVAL:
@@ -254,16 +274,16 @@ while running:
                 bullet.kill()
                 if player.hp <= 0:
                     running = False
-    '''
+    
     # Check if bullet hits enemy (only allow player bullets, here assume player bullet is GREEN)
     hits = pygame.sprite.groupcollide(enemies, bullets, True, False)
     for enemy, hit_bullets in hits.items():
-        # Only green bullets count as hitting the enemy
+        # Only green bullets (including PlayerBullet) count as hitting the enemy
         for bullet in hit_bullets:
             if bullet.image.get_at((0,0)) == GREEN:
                 score += 10
                 bullet.kill()
-    '''
+    
 
     # No collision damage between enemies and player
     # hits = pygame.sprite.spritecollide(player, enemies, False)
