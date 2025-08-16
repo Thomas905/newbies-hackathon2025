@@ -182,6 +182,9 @@ class GameArea:
         last_difficulty_time = start_time
         last_enemy_check_time = start_time
         bg_scroll_speed_per_frame = scroll_speed / 60
+        
+        shoot_cooldown = 200
+        last_shoot_time = 0
 
         while running:
             # Keep loop running at the right speed
@@ -193,14 +196,14 @@ class GameArea:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-            ''' 
+            
             current_time = pygame.time.get_ticks()
 
             if detector.is_grab:
                 if current_time - last_shoot_time > shoot_cooldown:
                     player.shoot()
                     last_shoot_time = current_time
-            '''
+        
             # --- Difficulty increases every DIFFICULTY_INTERVAL seconds ---
             now = time.time()
             if now - last_difficulty_time >= DIFFICULTY_INTERVAL:
@@ -209,7 +212,7 @@ class GameArea:
                 scroll_speed = BASE_SCROLL_SPEED + difficulty
                 enemy_speed = BASE_ENEMY_SPEED + difficulty
                 bg_scroll_speed_per_frame = scroll_speed // 60
-                # 更新所有现存敌人的速度
+                # Update speed for all existing enemies
                 for enemy in enemies:
                     enemy.speedy = enemy_speed
                 last_difficulty_time = now
@@ -225,7 +228,7 @@ class GameArea:
             # Enemies move with background scroll (pixel-based)
             for enemy in enemies:
                 enemy.scroll_with_bg(bg_scroll_speed_per_frame)
-    
+
             # --- Enemy supplement check every ENEMY_CHECK_INTERVAL seconds ---
             if now - last_enemy_check_time >= ENEMY_CHECK_INTERVAL:
                 missing = max_enemies - len(enemies)
@@ -253,16 +256,16 @@ class GameArea:
                         bullet.kill()
                         if player.hp <= 0:
                             running = False
-            '''
+            
             # Check if bullet hits enemy (only allow player bullets, here assume player bullet is GREEN)
             hits = pygame.sprite.groupcollide(enemies, bullets, True, False)
             for enemy, hit_bullets in hits.items():
-                # Only green bullets count as hitting the enemy
+                # Only green bullets (including PlayerBullet) count as hitting the enemy
                 for bullet in hit_bullets:
                     if bullet.image.get_at((0,0)) == GREEN:
                         score += 10
                         bullet.kill()
-            '''
+            
 
             # No collision damage between enemies and player
             # hits = pygame.sprite.spritecollide(player, enemies, False)
