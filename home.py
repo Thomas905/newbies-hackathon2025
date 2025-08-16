@@ -66,6 +66,5 @@ def layout_menu():
 
         pygame.display.flip()
         clock.tick(30)
-    detector.release()
 
 layout_menu()
