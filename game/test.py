@@ -3,6 +3,7 @@ import random
 import os
 import os.path as path
 import setting
+import time
 from hand_detection import HandDetector
 pygame.init()
 
@@ -40,28 +41,17 @@ class Player(pygame.sprite.Sprite):
         self.health = 100
 
     def update(self):
-        keys = pygame.key.get_pressed()
-        speed = 5
-        if keys[pygame.K_LEFT]:
-            self.rect.x -= speed
-        if keys[pygame.K_RIGHT]:
-            self.rect.x += speed
-        if keys[pygame.K_UP]:
-            self.rect.y -= speed
-        if keys[pygame.K_DOWN]:
-            self.rect.y += speed
-        # 限制移动范围
-        if self.rect.x < -20:
-            self.rect.x = -20
-        if self.rect.x > 390:
-            self.rect.x = 390
-        if self.rect.y < 30:
-            self.rect.y = 30
-        if self.rect.y > 650:
-            self.rect.y = 650
+        detector.update()
+
+        if detector.hand_center:
+            hand_x, hand_y = detector.hand_center
+            hand_x = screen.get_width() - hand_x  
+
+            self.rect.centerx = hand_x
+            self.rect.centery = hand_y
 
     def shoot(self):
-        bullet = Bullet(self.rect.centerx, self.rect.top)
+        bullet = Bullet(self.rect.centerx, self.rect.top, 5)
         all_sprites.add(bullet)
         bullets.add(bullet)
 
@@ -162,7 +152,6 @@ class GameArea:
         # 游戏循环
         clock = pygame.time.Clock()
         running = True
-        import time
         # 加载背景图像
         bg_img = pygame.image.load(path.join(setting.img_folder, "background2.png")).convert()
         bg_img = pygame.transform.scale(bg_img, (WIDTH, HEIGHT))
@@ -186,8 +175,10 @@ class GameArea:
         last_difficulty_time = start_time
         last_enemy_check_time = start_time
         bg_scroll_speed_per_frame = scroll_speed / 60
+        '''
         shoot_cooldown = 200
         last_shoot_time = 0
+        '''
 
         while running:
             # 保持循环以正确的速度运行
@@ -199,14 +190,14 @@ class GameArea:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                
-                current_time = pygame.time.get_ticks()
+            ''' 
+            current_time = pygame.time.get_ticks()
 
-                if detector.is_grab:
-                    if current_time - last_shoot_time > shoot_cooldown:
-                        player.shoot()
-                        last_shoot_time = current_time
-                
+            if detector.is_grab:
+                if current_time - last_shoot_time > shoot_cooldown:
+                    player.shoot()
+                    last_shoot_time = current_time
+            '''
             # --- Difficulty increases every DIFFICULTY_INTERVAL seconds ---
             now = time.time()
             if now - last_difficulty_time >= DIFFICULTY_INTERVAL:
@@ -290,5 +281,3 @@ class GameArea:
             
             # 刷新屏幕
             pygame.display.flip()
-
-pygame.quit()
