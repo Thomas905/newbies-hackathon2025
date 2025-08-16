@@ -5,7 +5,14 @@ import os.path as path
 import setting
 import time
 from hand_detection import HandDetector
+from control_mode import get_mode, set_mode, ControlMode
 pygame.init()
+
+# Globals & Create sprite groups
+all_sprites = pygame.sprite.Group()
+enemies = pygame.sprite.Group()
+bullets = pygame.sprite.Group()
+playing_mode_set = 0
 
 # Screen settings
 WIDTH = 450
@@ -14,12 +21,18 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("PVZ")
 detector = HandDetector()
 
+# Font
+font = pygame.font.SysFont("consolas", 32, bold=True)
+
 # Color definitions
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
+BG_COLOR = (15, 15, 20)
+HIGHLIGHT = (0, 200, 255)
+NORMAL = (200, 50, 50)
 
 # Load image
 def load_image(name, scale=1):
@@ -153,12 +166,6 @@ class PlayerBullet(Bullet):
         # Still destroy if out of screen
         if self.rect.top > HEIGHT or self.rect.bottom < 0:
             self.kill()
-
-
-# Create sprite groups
-all_sprites = pygame.sprite.Group()
-enemies = pygame.sprite.Group()
-bullets = pygame.sprite.Group()
 
 class GameArea:
     def layout_game_area(self):
@@ -311,3 +318,84 @@ class GameArea:
             
             # Refresh screen
             pygame.display.flip()
+
+class Settings:
+    def __init__(self):
+        self.options = ["Hand Tracking", "Arrow Keys"]
+        self.selected_index = 0
+        self.last_move_time = 0
+        self.cooldown = 300
+
+    def handle_navigation_key(self):
+        keys = pygame.key.get_pressed()
+        current_time = pygame.time.get_ticks()
+
+        if keys[pygame.K_UP] and current_time - self.last_move_time > self.cooldown:
+            self.selected_index = (self.selected_index - 1) % len(self.options)
+            self.last_move_time = current_time
+        elif keys[pygame.K_DOWN] and current_time - self.last_move_time > self.cooldown:
+            self.selected_index = (self.selected_index + 1) % len(self.options)
+            self.last_move_time = current_time
+
+    def handle_navigation_hand(self):
+        current_time = pygame.time.get_ticks()
+        if detector.movement and detector.hand_center:
+            if current_time - self.last_move_time > self.cooldown:
+                if detector.movement == "Down":
+                    self.selected_index = (self.selected_index + 1) % len(self.options)
+                elif detector.movement == "Up":
+                    self.selected_index = (self.selected_index - 1) % len(self.options)
+                self.last_move_time = current_time
+
+    def handle_grab(self):
+        if detector.is_grab:
+            selected = self.options[self.selected_index]
+            if selected == "Hand Tracking":
+                set_mode(ControlMode.HAND)
+            elif selected == "Arrow Keys":
+                set_mode(ControlMode.KEY)
+            print(f"Mode changé en: {selected}")
+            return True
+        return False
+
+    def layout_setting(self):
+        pygame.display.set_caption("Settings")
+        clock = pygame.time.Clock()
+        running = True
+
+        while running:
+            screen.fill(BG_COLOR)
+            detector.update()
+
+            title = font.render("⚙ SETTINGS ⚙", True, HIGHLIGHT)
+            screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 60))
+
+            for i, opt in enumerate(self.options):
+                color = HIGHLIGHT if i == self.selected_index else NORMAL
+                text = font.render(opt, True, color)
+                shadow = font.render(opt, True, (color[0] // 3, color[1] // 3, color[2] // 3))
+                y = 200 + i * 100
+                screen.blit(shadow, (WIDTH // 2 - shadow.get_width() // 2 + 4, y + 4))
+                screen.blit(text, (WIDTH // 2 - text.get_width() // 2, y))
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif (event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN) or detector.is_grab:
+                    selected = self.options[self.selected_index]
+                    if selected == "Hand Tracking":
+                        set_mode(ControlMode.HAND)
+                    elif selected == "Arrow Keys":
+                        set_mode(ControlMode.KEY)
+                    print(f"Mode changé en: {selected}")
+                    
+                    running = False
+
+            if get_mode() == ControlMode.HAND:
+                self.handle_navigation_hand()
+            elif get_mode() == ControlMode.KEY:
+                self.handle_navigation_key()
+
+            pygame.display.flip()
+            clock.tick(30)
+
