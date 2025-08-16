@@ -1,7 +1,7 @@
 from hand_detection import HandDetector 
 from game import GameArea, Settings
 from support import *
-import pygame
+import pygame, sys
 
 pygame.init()
 
@@ -40,6 +40,15 @@ detector = HandDetector()
 area = GameArea()
 settings = Settings()
 
+def execute_selection(choice):
+    if choice == "Start":
+        area.layout_game_area()
+    elif choice == "Settings":
+        settings.layout_setting()
+    elif choice == "Exit":
+        pygame.quit()
+        sys.exit()
+
 def layout_menu():
     running = True
     selected = 0
@@ -54,71 +63,43 @@ def layout_menu():
         detector.enabled = True
 
     while running:
-        # Background sky + grass
+        # Background
         screen.fill(SKY_BLUE)
         pygame.draw.rect(screen, GRASS_GREEN, (0, SCREEN_HEIGHT // 2, SCREEN_WIDTH, SCREEN_HEIGHT // 2))
-        
+
         if getattr(detector, "enabled", True):
             detector.update()
 
         new_grab = detector.is_grab and not last_grab and detector.hand_center
         last_grab = detector.is_grab
 
-        mode = get_mode()
-        print(mode)
-        if mode != current_mode:
-            current_mode = mode
-            if mode == ControlMode.HAND:
-                detector.enabled = False
-                detector.start_calibration()
-                detector.enabled = True
-            elif mode == ControlMode.KEY:
-                print("Keyboard mode selected!")
-
-        # Draw buttons
         for i, btn in enumerate(buttons):
             basic_button(btn, 125, 250 + i*120, selected == i)
 
-        # Event handling
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            if mode == ControlMode.KEY and event.type == pygame.KEYDOWN:
+            elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_DOWN:
                     selected = (selected + 1) % len(buttons)
                 elif event.key == pygame.K_UP:
                     selected = (selected - 1) % len(buttons)
                 elif event.key == pygame.K_RETURN:
-                    if buttons[selected] == "Start":
-                        area.layout_game_area()
-                    elif buttons[selected] == "Settings":
-                        settings.layout_setting()
-                    elif buttons[selected] == "Exit":
-                        running = False
+                    execute_selection(buttons[selected])
 
-        # Hand movement
-        if mode == ControlMode.HAND and detector.movement and detector.hand_center:
+        if detector.hand_center:
             current_time = pygame.time.get_ticks()
-            if current_time - last_move_time > 300:
+            if detector.movement and current_time - last_move_time > 300:
                 if detector.movement == "Down":
                     selected = (selected + 1) % len(buttons)
                 elif detector.movement == "Up":
                     selected = (selected - 1) % len(buttons)
                 last_move_time = current_time
 
-        # Hand grab
-        if mode == ControlMode.HAND and new_grab:
-            current_time = pygame.time.get_ticks()
-            if current_time - last_move_time > 300:
-                if buttons[selected] == "Start":
-                    area.layout_game_area()
-                elif buttons[selected] == "Settings":
-                    settings.layout_setting()
-                elif buttons[selected] == "Exit":
-                    running = False
+            if new_grab and current_time - last_move_time > 300:
+                execute_selection(buttons[selected])
                 last_move_time = current_time
 
         pygame.display.flip()
         clock.tick(30)
-
 layout_menu()

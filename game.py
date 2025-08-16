@@ -56,14 +56,27 @@ class Player(pygame.sprite.Sprite):
         self.cd_hint = False  # Whether to show "CD" above player
 
     def update(self):
-        detector.update()
+        if get_mode() == ControlMode.HAND:
+            detector.update()
+            if detector.hand_center:
+                hand_x, hand_y = detector.hand_center
+                hand_x = screen.get_width() - hand_x  
+                self.rect.centerx = hand_x
+                self.rect.centery = hand_y
 
-        if detector.hand_center:
-            hand_x, hand_y = detector.hand_center
-            hand_x = screen.get_width() - hand_x  
+        elif get_mode() == ControlMode.KEY:
+            keys = pygame.key.get_pressed()
+            speed = 5  # vitesse de déplacement
+            if keys[pygame.K_LEFT]:
+                self.rect.x -= speed
+            if keys[pygame.K_RIGHT]:
+                self.rect.x += speed
+            if keys[pygame.K_UP]:
+                self.rect.y -= speed
+            if keys[pygame.K_DOWN]:
+                self.rect.y += speed
 
-            self.rect.centerx = hand_x
-            self.rect.centery = hand_y
+        self.rect.clamp_ip(screen.get_rect())
 
     def shoot(self):
         # 玩家发射大子弹，速度等于卷轴速度，0.5s自毁
