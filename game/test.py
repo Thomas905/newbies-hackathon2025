@@ -36,6 +36,8 @@ class Player(pygame.sprite.Sprite):
         self.rect.x = 2 * 75
         self.rect.y = 30 + 8 * 60
         self.hp = 5
+        self.last_shoot_time = 0
+        self.cd_hint = False  # Whether to show "CD" above player
 
     def update(self):
         keys = pygame.key.get_pressed()
@@ -59,13 +61,18 @@ class Player(pygame.sprite.Sprite):
             self.rect.y = 650
 
     def shoot(self, bullet_type='normal'):
-        # Shoot different types of bullets by bullet_type
+        now = time.time()
+        if now - self.last_shoot_time < 0.3:
+            self.cd_hint = True
+            return
+        self.cd_hint = False
+        self.last_shoot_time = now
         if bullet_type == 'big':
             # 50x50 bullet, center y = player center y - 60
             bullet = PlayerBullet(
                 self.rect.centerx,
-                self.rect.centery - 60,
-                -bg_scroll_speed_per_frame,
+                self.rect.centery - 120,
+                bg_scroll_speed_per_frame,
                 color=GREEN
             )
         else:
@@ -160,6 +167,16 @@ class PlayerBullet(Bullet):
         self.rect = self.image.get_rect()
         self.rect.centerx = x
         self.rect.centery = y
+        self.spawn_time = time.time()
+
+    def update(self):
+        self.rect.y += self.speedy
+        # Auto-destroy after 0.5s
+        if time.time() - self.spawn_time > 0.5:
+            self.kill()
+        # Still destroy if out of screen
+        if self.rect.top > HEIGHT or self.rect.bottom < 0:
+            self.kill()
 
 
 # Create sprite groups
@@ -282,7 +299,7 @@ while running:
         for bullet in hit_bullets:
             if bullet.image.get_at((0,0)) == GREEN:
                 score += 10
-                bullet.kill()
+                # bullet.kill()  # <-- Remove this line, don't kill bullet on hit
     
 
     # No collision damage between enemies and player
@@ -305,7 +322,14 @@ while running:
     # Display hp
     hp_text = font.render(f"hp: {player.hp}", True, WHITE)
     screen.blit(hp_text, (10, 50))
-    
+
+    # Show "CD" above player if in cooldown
+    if getattr(player, 'cd_hint', False):
+        cd_text = font.render("CD", True, RED)
+        cd_x = player.rect.centerx - cd_text.get_width() // 2
+        cd_y = player.rect.top - cd_text.get_height() - 5
+        screen.blit(cd_text, (cd_x, cd_y))
+
     # Refresh screen
     pygame.display.flip()
 
