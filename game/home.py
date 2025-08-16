@@ -1,5 +1,5 @@
 from hand_detection import HandDetector 
-from game_area import GameArea
+from area_game import GameArea
 import pygame
 
 pygame.init()
