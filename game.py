@@ -522,6 +522,7 @@ class Settings:
                     selected = self.options[self.selected_index]
                     if selected == "Hand Tracking":
                         set_mode(ControlMode.HAND)
+                        detector.start_calibration()
                     elif selected == "Arrow Keys":
                         set_mode(ControlMode.KEY)
                     print(f"Mode changé en: {selected}")
@@ -532,6 +533,9 @@ class Settings:
                 self.handle_navigation_hand()
             elif get_mode() == ControlMode.KEY:
                 self.handle_navigation_key()
+            
+            if detector.is_fuck:
+                running = False
 
             pygame.display.flip()
             clock.tick(30)
