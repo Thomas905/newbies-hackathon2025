@@ -35,7 +35,7 @@ class Player(pygame.sprite.Sprite):
         # Initial pixel coordinates, centered
         self.rect.x = 2 * 75
         self.rect.y = 30 + 8 * 60
-        self.health = 100
+        self.hp = 5
 
     def update(self):
         keys = pygame.key.get_pressed()
@@ -98,6 +98,23 @@ class Enemy(pygame.sprite.Sprite):
         else:
             self.out_time = None
     def shoot(self, bullet_speed):
+        pass
+    def try_shoot(self, bullet_speed, now):
+        pass
+
+class Peashooter(Enemy):
+    def __init__(self, speed=0, bg_offset=0):
+        super().__init__(speed=speed, bg_offset=bg_offset)
+        image = pygame.image.load(path.join(setting.img_folder,"peashooter_candidate_0.png"))
+        self.image = pygame.transform.scale(image,(50,60))
+        self.rect = self.image.get_rect()
+        # Set random position (like Enemy)
+        self.grid_x = random.randint(0, 5)
+        self.grid_y = random.randint(-6, 0)
+        self.rect.x = 20 + self.grid_x * 75
+        self.rect.y = 5 + self.grid_y * 60
+
+    def shoot(self, bullet_speed):
         bullet = Bullet(self.rect.centerx, self.rect.bottom, bullet_speed, color=RED)
         all_sprites.add(bullet)
         bullets.add(bullet)
@@ -107,16 +124,6 @@ class Enemy(pygame.sprite.Sprite):
         if now - self.last_shoot_time >= 3:
             self.shoot(bullet_speed)
             self.last_shoot_time = now
-class Peashooter(Enemy):
-    def __init__(self):
-        super().__init__()
-        image = pygame.image.load(path.join(setting.img_folder,"peashooter_candidate_0.png"))
-        self.image = pygame.transform.scale(image,(75,60))
-        self.rect = self.image.get_rect()
-        self.rect.x = random.randrange(WIDTH - self.rect.width)
-        self.rect.y = random.randrange(-100, -40)
-        self.speedy = random.randrange(1, 5)
-        self.speedx = random.randrange(-2, 2)
 
 # Bullet class
 class Bullet(pygame.sprite.Sprite):
@@ -146,8 +153,8 @@ all_sprites.add(player)
 
 # Create enemies
 for i in range(4):
-    enemy = Enemy()
-    all_sprites.add(enemy)
+    enemy = Peashooter()
+    all_sprites.add(enemy)  # <-- add enemy to all_sprites
     enemies.add(enemy)
 
 # Score
@@ -168,9 +175,9 @@ BG_SCROLL_SPEED = 60  # pixels per scroll
 # --- Difficulty and enemy refresh parameters ---
 BASE_SCROLL_SPEED = 60  # initial scroll speed (pixels/sec)
 BASE_ENEMY_SPEED = 0    # initial enemy speed (pixels/sec)
-BASE_MAX_ENEMIES = 2
+BASE_MAX_ENEMIES = 3
 DIFFICULTY_INTERVAL = 1  # seconds per difficulty up
-ENEMY_CHECK_INTERVAL = 2  # seconds per enemy check
+ENEMY_CHECK_INTERVAL = 1  # seconds per enemy check
 
 difficulty = 0
 scroll_speed = BASE_SCROLL_SPEED
@@ -224,18 +231,18 @@ while running:
     if now - last_enemy_check_time >= ENEMY_CHECK_INTERVAL:
         missing = max_enemies - len(enemies)
         for _ in range(missing):
-            if random.random() < 0.5:
+            if random.random() < 0.8:
                 # New enemy y coordinate aligns with current background offset
-                enemy = Enemy(speed=enemy_speed, bg_offset=bg_y1)
+                enemy = Peashooter(speed=enemy_speed, bg_offset=bg_y1)
                 all_sprites.add(enemy)
                 enemies.add(enemy)
         last_enemy_check_time = now
     
     # Enemies shoot bullets
-    bullet_speed = bg_scroll_speed_per_frame * 2  # twice the scroll speed
+    bullet_speed = bg_scroll_speed_per_frame * 3  # 3 times of the scroll speed
     now = time.time()
     for enemy in enemies:
-        enemy.try_shoot(bullet_speed, now)
+        enemy.try_shoot(bullet_speed, 0.1 * random.randrange(0, 10) + now)
     # Update
     all_sprites.update()
 
@@ -243,9 +250,11 @@ while running:
     for bullet in bullets:
         if bullet.image.get_at((0,0)) == RED:
             if player.rect.colliderect(bullet.rect):
-                player.health -= 10
+                player.hp -= 1
                 bullet.kill()
-
+                if player.hp <= 0:
+                    running = False
+    '''
     # Check if bullet hits enemy (only allow player bullets, here assume player bullet is GREEN)
     hits = pygame.sprite.groupcollide(enemies, bullets, True, False)
     for enemy, hit_bullets in hits.items():
@@ -254,12 +263,13 @@ while running:
             if bullet.image.get_at((0,0)) == GREEN:
                 score += 10
                 bullet.kill()
-    
+    '''
+
     # No collision damage between enemies and player
     # hits = pygame.sprite.spritecollide(player, enemies, False)
     # if hits:
-    #     player.health -= 1
-    #     if player.health <= 0:
+    #     player.hp -= 1
+    #     if player.hp <= 0:
     #         running = False
     
     # Render
@@ -272,9 +282,9 @@ while running:
     score_text = font.render(f"score: {score}", True, WHITE)
     screen.blit(score_text, (10, 10))
     
-    # Display health
-    health_text = font.render(f"hp: {player.health}", True, WHITE)
-    screen.blit(health_text, (10, 50))
+    # Display hp
+    hp_text = font.render(f"hp: {player.hp}", True, WHITE)
+    screen.blit(hp_text, (10, 50))
     
     # Refresh screen
     pygame.display.flip()
