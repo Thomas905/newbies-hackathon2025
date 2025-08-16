@@ -165,13 +165,12 @@ def layout_menu():
         if show_rage_quit_msg:
             elapsed = pygame.time.get_ticks() - rage_quit_timer
 
-            if buttons[selected] != "Exit":
-                if elapsed < 6000:
-                    msg = font.render("Rage quit detected !", True, (255, 0, 0))
-                    screen.blit(msg, (SCREEN_WIDTH // 2 - msg.get_width() // 2, 100))
-                else:
-                    show_rage_quit_msg = False
-                    rage_quit_sfx_played = False  
+            if elapsed < 6000:
+                msg = font.render("Rage quit detected !", True, (255, 0, 0))
+                screen.blit(msg, (SCREEN_WIDTH // 2 - msg.get_width() // 2, 100))
+            else:
+                show_rage_quit_msg = False
+                rage_quit_sfx_played = False  
 
         pygame.display.flip()
         clock.tick(30)

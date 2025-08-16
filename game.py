@@ -442,12 +442,17 @@ class GameArea:
                 screen.blit(e["image"], e["rect"])
 
             # Display score
-            score_text = font.render(f"score: {score}", True, WHITE)
-            screen.blit(score_text, (10, 10))
+            coin_image = pygame.image.load("assets/images/Customs/coin.png") 
+            coin_image = pygame.transform.scale(coin_image, (40, 40))
+            score_text = font.render(f"{score}", True, WHITE)
+            screen.blit(score_text, (20, 10))
+            screen.blit(coin_image, (10 + score_text.get_width() + 10, 3))
             
             # Display hp
-            hp_text = font.render(f"hp: {player.hp}", True, WHITE)
-            screen.blit(hp_text, (10, 50))
+            heart_image = pygame.image.load("assets/images/Customs/Heart.png") 
+            heart_image = pygame.transform.scale(heart_image, (40, 40))
+            for i in range(player.hp):
+                screen.blit(heart_image, (10 + i * 50, 50))
             
             # Refresh screen
             pygame.display.flip()
