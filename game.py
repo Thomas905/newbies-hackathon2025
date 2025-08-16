@@ -25,12 +25,19 @@ HEIGHT = 720
 screen = setting.pygame.display.set_mode((WIDTH, HEIGHT))
 setting.pygame.display.set_caption("PVZ")
 
+# constants matching your board
+MAX_COL = 5   # columns 0..5  (6 cols)
+MAX_ROW = 10  # rows    0..10 (11 rows)
+
 # Colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
+
+# Time before next enemies spam
+SPON_TIME = 300
 
 # Load image
 def load_image(name, scale=1):
@@ -49,6 +56,9 @@ class Player(setting.pygame.sprite.Sprite):
         # Status
         self.grid_x = 2  # Spam from third column
         self.grid_y = 6  # Spam from 7th row
+        self.vel_x = 0
+        self.vel_y = 0
+        self.speed = 0.5
         self.update_position()
         self.health = 100
         self.last_move_time = 0 # Record command timeline
@@ -63,37 +73,49 @@ class Player(setting.pygame.sprite.Sprite):
         if ((now - self.last_move_time) < self.move_cooldown):
             return  # too soon, skip this frame
         
+        # reset velocities every frame so old moves don't leak in
+        self.vel_x = 0
+        self.vel_y = 0
+
         moved = False
         if (command == "UP" and self.grid_y > 0):
-            self.grid_y -= 1
+            self.vel_y = -self.speed
             moved = True
-        if (command == "UPRIGHT" and self.grid_y > 0 and self.grid_x < 5):
-            self.grid_x += 0.5
-            self.grid_y -= 0.5
+        if (command == "UPRIGHT" and self.grid_y > 0 and self.grid_x < MAX_COL):
+            self.vel_x = self.speed
+            self.vel_y = -self.speed
             moved = True
-        if (command == "RIGHT" and self.grid_x < 5):
-            self.grid_x += 1
+        if (command == "RIGHT" and self.grid_x < MAX_COL):
+            self.vel_x = self.speed
             moved = True
-        if (command == "DOWNRIGHT" and self.grid_y < 10 and self.grid_x < 5):
-            self.grid_x += 0.5
-            self.grid_y += 0.5
+        if (command == "DOWNRIGHT" and self.grid_y < MAX_ROW and self.grid_x < MAX_COL):
+            self.vel_x = self.speed
+            self.vel_y = self.speed
             moved = True
-        if (command == "DOWN" and self.grid_y < 10):
-            self.grid_y += 1
+        if (command == "DOWN" and self.grid_y < MAX_ROW):
+            self.vel_y = self.speed
             moved = True
-        if (command == "DOWNLEFT" and self.grid_y < 10 and self.grid_x > 0):
-            self.grid_x -= 0.5
-            self.grid_y += 0.5
+        if (command == "DOWNLEFT" and self.grid_y < MAX_ROW and self.grid_x > 0):
+            self.vel_x = -self.speed
+            self.vel_y = self.speed
             moved = True
         if (command == "LEFT" and self.grid_x > 0):
-            self.grid_x -= 1
+            self.vel_x = -self.speed
             moved = True
         if (command == "UPLEFT" and self.grid_y > 0 and self.grid_x > 0):
-            self.grid_x -= 0.5
-            self.grid_y -= 0.5
+            self.vel_x = -self.speed
+            self.vel_y = -self.speed
             moved = True
 
         if moved:
+            # propose new position
+            nx = self.grid_x + self.vel_x
+            ny = self.grid_y + self.vel_y
+            # clamp to grid bounds
+            nx = max(0, min(MAX_COL, nx))
+            ny = max(0, min(MAX_ROW, ny))
+
+            self.grid_x, self.grid_y = nx, ny
             self.update_position()
             self.last_move_time = now
 
@@ -184,11 +206,8 @@ def main_game():
     enemies = setting.pygame.sprite.Group()
     bullets = setting.pygame.sprite.Group()
 
-    # Create an enemy
-    for i in range(4):
-        enemy = Enemy()
-        all_sprites.add(enemy)
-        enemies.add(enemy)
+    # Enemy will be spamed after this amount of time
+    counter = SPON_TIME
 
     # Create Player
     player = Player()
@@ -211,7 +230,16 @@ def main_game():
 
     while (running and webcam.isOpened()):
         # Keep the loop running at the correct speed.
-        clock.tick(30)
+        clock.tick(60)
+        
+        # Spon enemies every 300 frames / 60 ms = 5 sec
+        if (counter == 0):
+            # Create new enemies
+            for i in range(5):
+                enemy = Enemy()
+                all_sprites.add(enemy)
+                enemies.add(enemy)
+            counter = SPON_TIME
 
         #player.shoot() # Keeping the player shooting
 
@@ -335,6 +363,8 @@ def main_game():
         if (setting.cv.waitKey(1) & 0xFF == 27): # If ESC is pressed, escape
             break
         
+        counter -= 1 # Decrement counter
+
         # Refresh the screen
         setting.pygame.display.flip()
 
