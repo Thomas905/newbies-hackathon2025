@@ -39,6 +39,7 @@ class HandDetector:
         self._capture_thread.start()
 
         self.calibrated = False
+        self.is_fuck = False
 
     def _capture_loop(self):
         while self.running:
@@ -100,6 +101,7 @@ class HandDetector:
 
         self.movement = None
         self.is_grab = False
+        self.is_fuck = False   # <<< ajouté
         self.hand_center = None
 
         if result.multi_hand_landmarks:
@@ -107,14 +109,33 @@ class HandDetector:
             h, w, _ = frame.shape
             points = np.array([[int(lm.x * w), int(lm.y * h)] for lm in hand_landmarks.landmark], dtype=np.int32)
 
+            # centre main
             x, y, w_box, h_box = cv2.boundingRect(points)
             center = (x + w_box // 2, y + h_box // 2)
             self.hand_center = center
 
+            # grab (pouce/index)
             idx_tip = hand_landmarks.landmark[8]
             thumb_tip = hand_landmarks.landmark[4]
             dist = np.sqrt((idx_tip.x - thumb_tip.x) ** 2 + (idx_tip.y - thumb_tip.y) ** 2)
             self.is_grab = dist < self.grab_threshold
+
+            # fuck gesture (majeur levé, autres doigts pliés)
+            lm = [(int(pt.x * w), int(pt.y * h)) for pt in hand_landmarks.landmark]
+            idx_tip, idx_mcp = lm[8], lm[6]
+            mid_tip, mid_mcp = lm[12], lm[10]
+            ring_tip, ring_mcp = lm[16], lm[14]
+            pinky_tip, pinky_mcp = lm[20], lm[18]
+            thumb_tip, thumb_ip = lm[4], lm[3]
+
+            middle_up = mid_tip[1] < mid_mcp[1]
+            index_down = idx_tip[1] > idx_mcp[1]
+            ring_down = ring_tip[1] > ring_mcp[1]
+            pinky_down = pinky_tip[1] > pinky_mcp[1]
+            thumb_down = thumb_tip[0] < thumb_ip[0]
+
+            if middle_up and index_down and ring_down and pinky_down and thumb_down:
+                self.is_fuck = True
 
             # mouvement
             if not self.is_grab and self.prev_center:
@@ -135,7 +156,8 @@ class HandDetector:
 
             self.prev_center = center
 
-        return self.hand_center, self.is_grab, self.movement
+        return self.hand_center, self.is_grab, self.movement, self.is_fuck
+
 
     def stop(self):
         self.running = False
@@ -150,3 +172,21 @@ class HandDetector:
         self.upper_hsv = None
         cv2.destroyAllWindows()
         print("Hand tracking stopped safely.")
+
+    def detect_fuck(self, hand_landmarks, h, w):
+        lm = [(int(pt.x * w), int(pt.y * h)) for pt in hand_landmarks.landmark]
+
+        idx_tip, idx_mcp = lm[8], lm[6]
+        mid_tip, mid_mcp = lm[12], lm[10]
+        ring_tip, ring_mcp = lm[16], lm[14]
+        pinky_tip, pinky_mcp = lm[20], lm[18]
+        thumb_tip, thumb_ip = lm[4], lm[3]
+
+        middle_up = mid_tip[1] < mid_mcp[1]
+
+        index_down = idx_tip[1] > idx_mcp[1]
+        ring_down = ring_tip[1] > ring_mcp[1]
+        pinky_down = pinky_tip[1] > pinky_mcp[1]
+        thumb_down = thumb_tip[0] < thumb_ip[0]
+
+        return middle_up and index_down and ring_down and pinky_down and thumb_down

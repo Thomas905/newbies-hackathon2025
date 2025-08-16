@@ -56,6 +56,8 @@ def layout_menu():
     last_move_time = 0 
     last_grab = False
     current_mode = get_mode()
+    show_rage_quit_msg = False
+    rage_quit_timer = 0
 
     if current_mode == ControlMode.HAND:
         detector.enabled = False
@@ -69,6 +71,10 @@ def layout_menu():
 
         if getattr(detector, "enabled", True):
             detector.update()
+            if getattr(detector, "is_fuck", False):
+                show_rage_quit_msg = True
+                rage_quit_timer = pygame.time.get_ticks()
+                detector.is_fuck = False 
 
         new_grab = detector.is_grab and not last_grab and detector.hand_center
         last_grab = detector.is_grab
@@ -99,7 +105,13 @@ def layout_menu():
             if new_grab and current_time - last_move_time > 300:
                 execute_selection(buttons[selected])
                 last_move_time = current_time
-
+        if show_rage_quit_msg:
+            elapsed = pygame.time.get_ticks() - rage_quit_timer
+            if elapsed < 2000:
+                msg = font.render("😡 Rage quit detected!", True, (255, 0, 0))
+                screen.blit(msg, (SCREEN_WIDTH // 2 - msg.get_width() // 2, 100))
+            else:
+                show_rage_quit_msg = False
         pygame.display.flip()
         clock.tick(30)
 layout_menu()

@@ -156,15 +156,6 @@ class Peashooter(Enemy):
 
 # Bullet class
 class Bullet(pygame.sprite.Sprite):
-    """
-    子弹超类，描述所有子弹。
-    参数:
-        x, y: 生成位置
-        speedx, speedy: x/y方向速度
-        damage_type: 伤害类型（0=对敌，1=对玩家）
-        color: 子弹颜色
-        size: 子弹尺寸 (w, h)
-    """
     def __init__(self, x, y, speedx, speedy, damage_type, color, size=(5, 5)):
         super().__init__()
         self.image = pygame.Surface(size)
@@ -183,9 +174,6 @@ class Bullet(pygame.sprite.Sprite):
             self.kill()
 
 class PlayerBullet(Bullet):
-    """
-    玩家子弹：大子弹，伤害类型0，对敌有效，0.5s后自毁
-    """
     def __init__(self, x, y, speedy):
         super().__init__(x, y, 0, -speedy, damage_type=0, color=GREEN, size=(10, 10))
         self.spawn_time = time.time()
@@ -196,9 +184,6 @@ class PlayerBullet(Bullet):
             self.kill()
 
 class EnemyBullet(Bullet):
-    """
-    敌人子弹，伤害类型1，对玩家有效
-    """
     def __init__(self, x, y, speedy):
         super().__init__(x, y, 0, speedy, damage_type=1, color=RED, size=(9, 9))
 
@@ -266,6 +251,9 @@ class GameArea:
                 if current_time - last_shoot_time > shoot_cooldown:
                     player.shoot()
                     last_shoot_time = current_time
+
+            if detector.is_fuck:
+                running = False
         
             # --- Difficulty increases every DIFFICULTY_INTERVAL seconds ---
             now = time.time()
@@ -327,14 +315,6 @@ class GameArea:
                     if getattr(bullet, 'damage_type', None) == 0:  # 玩家子弹
                         score += 10
                         bullet.kill()  # 玩家子弹击中敌人后销毁
-            
-
-            # No collision damage between enemies and player
-            # hits = pygame.sprite.spritecollide(player, enemies, False)
-            # if hits:
-            #     player.hp -= 1
-            #     if player.hp <= 0:
-            #         running = False
             
             # Render
             screen.fill(BLACK)
