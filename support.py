@@ -1,5 +1,4 @@
 import os.path as path
-import pygame
 
 SCREEN_WIDTH = 450
 SCREEN_HEIGHT = 720

@@ -26,6 +26,7 @@ class GameArea:
         self.all_sprites = pygame.sprite.Group()
         self.enemies = pygame.sprite.Group()
         self.bullets = pygame.sprite.Group()
+        self.bullet1 = pygame.sprite.Group()
         self.player = None
 
     def layout_game_area(self):
@@ -75,7 +76,13 @@ class GameArea:
             current_time = pygame.time.get_ticks()
             if self.detector.is_grab:
                 if current_time - last_shoot_time > shoot_cooldown:
+                    # 玩家射击
+                    # 先调用shoot生成PendingPlayerBullet
                     self.player.shoot()
+                    # 将所有新生成的PendingPlayerBullet加入all_sprites
+                    for bullet in self.bullets:
+                        if bullet not in self.all_sprites:
+                            self.all_sprites.add(bullet)
                     last_shoot_time = current_time
 
             now = time.time()
@@ -114,19 +121,26 @@ class GameArea:
             self.all_sprites.update()
             self.bullets.update()
 
+            # 检查敌人子弹击中玩家
             for bullet in self.bullets:
-                if bullet.image.get_at((0,0)) == RED:
+                if getattr(bullet, 'damage_type', None) == 1:  # 敌人子弹
                     if self.player.rect.colliderect(bullet.rect):
                         self.player.hp -= 1
                         bullet.kill()
                         if self.player.hp <= 0:
                             running = False
 
+            # 检查玩家子弹击中敌人
+            for bullet in self.bullets:
+                if getattr(bullet, 'damage_type', None) == 0:  # 玩家子弹
+                    if self.player.rect.colliderect(bullet.rect):
+                        score += 10
+                        bullet.kill()
             hits = pygame.sprite.groupcollide(self.enemies, self.bullets, True, False)
             for enemy, hit_bullets in hits.items():
                 for bullet in hit_bullets:
-                    if bullet.image.get_at((0,0)) == GREEN:
-                        score += 10
+                    if getattr(bullet, 'damage_type', None) == 0:  # 只允许玩家子弹伤害敌人
+                        
 
             screen.fill(BLACK)
             screen.blit(bg_img, (0, bg_y1))

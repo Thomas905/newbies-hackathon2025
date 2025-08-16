@@ -29,24 +29,30 @@ class Player(pygame.sprite.Sprite):
             hand_x = SCREEN_WIDTH - hand_x
             self.rect.centerx = hand_x
             self.rect.centery = hand_y
+        # 冷却结束自动隐藏cd_hint
+        if self.cd_hint and (time.time() - self.last_shoot_time >= 1.0):
+            self.cd_hint = False
 
     def shoot(self, bullet_type='normal'):
         now = time.time()
-        if now - self.last_shoot_time < 0.3:
+        if now - self.last_shoot_time < 1.0:  # 冷却1秒
             self.cd_hint = True
             return
         self.cd_hint = False
         self.last_shoot_time = now
-        if bullet_type == 'big':
-            bullet = PlayerBullet(
-                self.rect.centerx,
-                self.rect.centery - 120,
-                self.bg_scroll_speed_per_frame,
-                color=GREEN
-            )
-        else:
-            bullet = Bullet(self.rect.centerx, self.rect.top, -self.bg_scroll_speed_per_frame, color=GREEN)
-        self.bullets_group.add(bullet)
+        # 计算落点
+        bullet_x = self.rect.centerx
+        bullet_y = self.rect.centery - 120
+        # 添加PendingPlayerBullet
+        pending = PendingPlayerBullet(
+            bullet_x,
+            bullet_y,
+            self.bg_scroll_speed_per_frame,
+            self.bullets_group,
+            self.bullets_group  # 这里all_sprites会在main.py中补充
+        )
+        self.bullets_group.add(pending)
+        # 注意：main.py中也要将pending加入all_sprites
 
 # Enemy class
 class Enemy(pygame.sprite.Sprite):
@@ -102,7 +108,8 @@ class Peashooter(Enemy):
         self.rect.y = 5 + self.grid_y * 60
 
     def shoot(self, bullet_speed, all_sprites, bullets_group):
-        bullet = Bullet(self.rect.centerx, self.rect.bottom, bullet_speed, color=RED)
+        # 敌人子弹，速度为bullet_speed，伤害类型1
+        bullet = EnemyBullet(self.rect.centerx, self.rect.bottom, bullet_speed)
         all_sprites.add(bullet)
         bullets_group.add(bullet)
 
@@ -114,36 +121,84 @@ class Peashooter(Enemy):
             self.last_shoot_time = now
 
 class Bullet(pygame.sprite.Sprite):
-    def __init__(self, x, y, speedy, color=GREEN):
+    """
+    Base class for bullets, can be used for both player and enemy bullets.
+    """
+    def __init__(self, x, y, speedx, speedy, damage_type, color, size=(5, 5)):
         super().__init__()
-        self.image = pygame.Surface((5, 5))
+        self.image = pygame.Surface(size)
         self.image.fill(color)
         self.rect = self.image.get_rect()
         self.rect.centerx = x
         self.rect.top = y
+        self.speedx = speedx
         self.speedy = speedy
+        self.damage_type = damage_type  # 0: 对敌, 1: 对玩家
 
     def update(self):
+        self.rect.x += self.speedx
         self.rect.y += self.speedy
-        # Destroy automatically if out of screen
-        if self.rect.top > SCREEN_HEIGHT or self.rect.bottom < 0:
+        if self.rect.top > SCREEN_HEIGHT or self.rect.bottom < 0 or self.rect.right < 0 or self.rect.left > SCREEN_WIDTH:
             self.kill()
 
-class PlayerBullet(Bullet):
-    def __init__(self, x, y, speedy, color=GREEN):
-        super().__init__(x, y, speedy, color)
-        self.image = pygame.Surface((50, 50))
-        self.image.fill(color)
+class PendingPlayerBullet(pygame.sprite.Sprite):
+    """
+    只做落点感叹号提示，不参与碰撞和伤害。用文字"!"显示。
+    """
+    def __init__(self, x, y, speedy, bullets_group, all_sprites):
+        super().__init__()
+        self.x = x
+        self.y = y
+        self.speedy = speedy
+        self.bullets_group = bullets_group
+        self.all_sprites = all_sprites
+        self.spawn_time = time.time()
+        # 用文字"!"作为感叹号
+        font = pygame.font.SysFont(None, 48)
+        self.image = font.render("!", True, (255, 0, 0))
         self.rect = self.image.get_rect()
         self.rect.centerx = x
         self.rect.centery = y
+
+    def update(self):
+        # 0.2s后生成真正的玩家子弹，仅生成，不参与碰撞
+        if time.time() - self.spawn_time > 0.2:
+            bullet = PlayerBullet(self.x, self.y, self.speedy)
+            self.bullets_group.add(bullet)
+            self.all_sprites.add(bullet)
+            self.kill()
+
+class PlayerBullet(Bullet):
+    """
+    50 * 50, harm type 0, only harm enemy, lifecycle 0.5s
+    """
+    def __init__(self, x, y, speedy):
+        super().__init__(x, y, 0, speedy, damage_type=0, color=GREEN, size=(50, 50))
         self.spawn_time = time.time()
 
     def update(self):
-        self.rect.y += self.speedy
-        # Auto-destroy after 0.5s
+        super().update()
         if time.time() - self.spawn_time > 0.5:
             self.kill()
-        # Still destroy if out of screen
-        if self.rect.top > SCREEN_HEIGHT or self.rect.bottom < 0:
+
+class EnemyBullet(Bullet):
+    """
+    5 * 5, harm type 1, only harm player, destroy when hit player
+    支持贴图PB01.gif
+    """
+    def __init__(self, x, y, speedy):
+        super().__init__(x, y, 0, speedy, damage_type=1, color=RED, size=(5, 5))
+        img_path = path.join(IMG_FOLDER, "PB01.gif")
+        if path.exists(img_path):
+            image = pygame.image.load(img_path).convert_alpha()
+            image = pygame.transform.scale(image, (24, 24))
+            self.image = image
+            self.rect = self.image.get_rect()
+            self.rect.centerx = x
+            self.rect.top = y
+
+    def update(self):
+        self.rect.x += self.speedx
+        self.rect.y += self.speedy
+        if self.rect.top > SCREEN_HEIGHT or self.rect.bottom < 0 or self.rect.right < 0 or self.rect.left > SCREEN_WIDTH:
             self.kill()
