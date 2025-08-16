@@ -66,7 +66,8 @@ class Player(pygame.sprite.Sprite):
             self.rect.centery = hand_y
 
     def shoot(self):
-        bullet = Bullet(self.rect.centerx, self.rect.top, 5)
+        # 玩家发射大子弹，速度等于卷轴速度，0.5s自毁
+        bullet = PlayerBullet(self.rect.centerx, self.rect.top, 5)  # 5可替换为卷轴速度
         all_sprites.add(bullet)
         bullets.add(bullet)
 
@@ -105,9 +106,16 @@ class Enemy(pygame.sprite.Sprite):
         else:
             self.out_time = None
     def shoot(self, bullet_speed):
-        pass
+        # 敌人子弹，速度为bullet_speed，伤害类型1
+        bullet = EnemyBullet(self.rect.centerx, self.rect.bottom, bullet_speed)
+        all_sprites.add(bullet)
+        bullets.add(bullet)
     def try_shoot(self, bullet_speed, now):
-        pass
+        if not hasattr(self, 'last_shoot_time'):
+            self.last_shoot_time = now
+        if now - self.last_shoot_time >= 3:
+            self.shoot(bullet_speed)
+            self.last_shoot_time = now
 
 class Peashooter(Enemy):
     def __init__(self, speed=0, bg_offset=0):
@@ -122,7 +130,8 @@ class Peashooter(Enemy):
         self.rect.y = 5 + self.grid_y * 60
 
     def shoot(self, bullet_speed):
-        bullet = Bullet(self.rect.centerx, self.rect.bottom, bullet_speed, color=RED)
+        # 敌人子弹，速度为bullet_speed，伤害类型1
+        bullet = EnemyBullet(self.rect.centerx, self.rect.bottom, bullet_speed)
         all_sprites.add(bullet)
         bullets.add(bullet)
     def try_shoot(self, bullet_speed, now):
@@ -134,38 +143,51 @@ class Peashooter(Enemy):
 
 # Bullet class
 class Bullet(pygame.sprite.Sprite):
-    def __init__(self, x, y, speedy, color=GREEN):
+    """
+    子弹超类，描述所有子弹。
+    参数:
+        x, y: 生成位置
+        speedx, speedy: x/y方向速度
+        damage_type: 伤害类型（0=对敌，1=对玩家）
+        color: 子弹颜色
+        size: 子弹尺寸 (w, h)
+    """
+    def __init__(self, x, y, speedx, speedy, damage_type, color, size=(5, 5)):
         super().__init__()
-        self.image = pygame.Surface((5, 5))
+        self.image = pygame.Surface(size)
         self.image.fill(color)
         self.rect = self.image.get_rect()
         self.rect.centerx = x
         self.rect.top = y
+        self.speedx = speedx
         self.speedy = speedy
+        self.damage_type = damage_type  # 0: 对敌, 1: 对玩家
+
     def update(self):
+        self.rect.x += self.speedx
         self.rect.y += self.speedy
-        # Destroy automatically if out of screen
-        if self.rect.top > HEIGHT or self.rect.bottom < 0:
+        if self.rect.top > HEIGHT or self.rect.bottom < 0 or self.rect.right < 0 or self.rect.left > WIDTH:
             self.kill()
 
 class PlayerBullet(Bullet):
-    def __init__(self, x, y, speedy, color=GREEN):
-        super().__init__(x, y, speedy, color)
-        self.image = pygame.Surface((50, 50))
-        self.image.fill(color)
-        self.rect = self.image.get_rect()
-        self.rect.centerx = x
-        self.rect.centery = y
+    """
+    玩家子弹：大子弹，伤害类型0，对敌有效，0.5s后自毁
+    """
+    def __init__(self, x, y, speedy):
+        super().__init__(x, y, 0, -speedy, damage_type=0, color=GREEN, size=(10, 10))
         self.spawn_time = time.time()
 
     def update(self):
-        self.rect.y += self.speedy
-        # Auto-destroy after 0.5s
+        super().update()
         if time.time() - self.spawn_time > 0.5:
             self.kill()
-        # Still destroy if out of screen
-        if self.rect.top > HEIGHT or self.rect.bottom < 0:
-            self.kill()
+
+class EnemyBullet(Bullet):
+    """
+    敌人子弹，伤害类型1，对玩家有效
+    """
+    def __init__(self, x, y, speedy):
+        super().__init__(x, y, 0, speedy, damage_type=1, color=RED, size=(9, 9))
 
 class GameArea:
     def layout_game_area(self):
@@ -276,23 +298,22 @@ class GameArea:
             # Update
             all_sprites.update()
 
-            # Check if bullet hits player (only enemy bullets, i.e. color=RED)
+            # 检查敌人子弹击中玩家
             for bullet in bullets:
-                if bullet.image.get_at((0,0)) == RED:
+                if getattr(bullet, 'damage_type', None) == 1:  # 敌人子弹
                     if player.rect.colliderect(bullet.rect):
                         player.hp -= 1
                         bullet.kill()
                         if player.hp <= 0:
                             running = False
-            
-            # Check if bullet hits enemy (only allow player bullets, here assume player bullet is GREEN)
+
+            # 检查玩家子弹击中敌人
             hits = pygame.sprite.groupcollide(enemies, bullets, True, False)
             for enemy, hit_bullets in hits.items():
-                # Only green bullets (including PlayerBullet) count as hitting the enemy
                 for bullet in hit_bullets:
-                    if bullet.image.get_at((0,0)) == GREEN:
+                    if getattr(bullet, 'damage_type', None) == 0:  # 玩家子弹
                         score += 10
-                        # bullet.kill()  # <-- Remove this line, don't kill bullet on hit
+                        bullet.kill()  # 玩家子弹击中敌人后销毁
             
 
             # No collision damage between enemies and player
