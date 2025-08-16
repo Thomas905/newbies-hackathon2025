@@ -1,7 +1,7 @@
 import pygame
 from hand_detection import HandDetector
 
-detector = HandDetector()  # récupérer la même instance que settings si possible
+detector = HandDetector()
 
 pygame.init()
 screen = pygame.display.set_mode((800, 600))
