@@ -5,7 +5,7 @@ import os.path as path
 import setting
 import time
 from hand_detection import HandDetector
-from control_mode import get_mode, set_mode, ControlMode
+from support import get_mode, set_mode, ControlMode
 pygame.init()
 
 # Globals & Create sprite groups

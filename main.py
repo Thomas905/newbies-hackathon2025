@@ -1,6 +1,6 @@
 from hand_detection import HandDetector 
-from test import GameArea, Settings
-from control_mode import get_mode, ControlMode
+from game import GameArea, Settings
+from support import *
 import pygame
 
 pygame.init()
@@ -65,6 +65,7 @@ def layout_menu():
         last_grab = detector.is_grab
 
         mode = get_mode()
+        print(mode)
         if mode != current_mode:
             current_mode = mode
             if mode == ControlMode.HAND:
