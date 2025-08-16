@@ -80,7 +80,7 @@ class Enemy(pygame.sprite.Sprite):
 
     def update_position(self):
         self.rect.x = self.grid_x * 75
-        self.rect.y = 30 + self.grid_y * 60
+        self.rect.y = 10 + self.grid_y * 60
 
     def scroll_with_bg(self, scroll_amount):
         self.grid_y += scroll_amount // 60  # 每次卷轴移动一格
@@ -150,7 +150,7 @@ clock = pygame.time.Clock()
 running = True
 import time
 # 加载背景图像
-bg_img = pygame.image.load(path.join(setting.img_folder, "background.png")).convert()
+bg_img = pygame.image.load(path.join(setting.img_folder, "background2.png")).convert()
 bg_img = pygame.transform.scale(bg_img, (WIDTH, HEIGHT))
 bg_y1 = 0
 bg_y2 = -HEIGHT
