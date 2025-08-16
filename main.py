@@ -1,9 +1,36 @@
 from hand_detection import HandDetector 
 from game import GameArea, Settings
 from support import *
-import pygame, sys
+import pygame
+import os
+import os.path as path
+import sys
+
+snd_folder = path.join("entity", "snd")
+# 声音文件变量
+BGM_MENU = path.join(snd_folder, "bgm_menu.mp3")
+BGM_GAME = path.join(snd_folder, "bgm_game.mp3")
+SFX_MENU_ENTER = path.join(snd_folder, "menu_enter.mp3")
+SFX_MENU_SWITCH_ON = path.join(snd_folder, "menu_switch_on.mp3")
+SFX_MENU_SWITCH_OFF = path.join(snd_folder, "menu_switch_off.mp3")
+SFX_QUIT = path.join(snd_folder, "quit.mp3")
 
 pygame.init()
+pygame.mixer.init()
+
+def play_bgm(bgm_path):
+    pygame.mixer.music.stop()
+    if os.path.exists(bgm_path):
+        pygame.mixer.music.load(bgm_path)
+        pygame.mixer.music.play(-1)
+
+def play_sfx(sfx_path):
+    if os.path.exists(sfx_path):
+        try:
+            sound = pygame.mixer.Sound(sfx_path)
+            sound.play()
+        except Exception:
+            pass
 
 # Screen
 SCREEN_WIDTH = 450
@@ -50,6 +77,7 @@ def execute_selection(choice):
         sys.exit()
 
 def layout_menu():
+    play_bgm(BGM_MENU)
     running = True
     selected = 0
     buttons = ["Start", "Settings", "Exit"]
@@ -58,6 +86,7 @@ def layout_menu():
     current_mode = get_mode()
     show_rage_quit_msg = False
     rage_quit_timer = 0
+    rage_quit_sfx_played = False  # 新增变量，防止多次播放
 
     if current_mode == ControlMode.HAND:
         detector.enabled = False
@@ -75,23 +104,38 @@ def layout_menu():
                 show_rage_quit_msg = True
                 rage_quit_timer = pygame.time.get_ticks()
                 detector.is_fuck = False 
+                if not rage_quit_sfx_played:
+                    play_sfx(SFX_QUIT)
+                    rage_quit_sfx_played = True
 
         new_grab = detector.is_grab and not last_grab and detector.hand_center
         last_grab = detector.is_grab
 
         for i, btn in enumerate(buttons):
-            basic_button(btn, 125, 250 + i*120, selected == i)
+            basic_button(btn, 125, 250 + i * 120, selected == i)
 
+        # Event handling
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.KEYDOWN:
+            # if mode == ControlMode.KEY and event.type == pygame.KEYDOWN:
+            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_DOWN:
                     selected = (selected + 1) % len(buttons)
+                    play_sfx(SFX_MENU_SWITCH_OFF)
                 elif event.key == pygame.K_UP:
                     selected = (selected - 1) % len(buttons)
+                    play_sfx(SFX_MENU_SWITCH_ON)
                 elif event.key == pygame.K_RETURN:
-                    execute_selection(buttons[selected])
+                    play_sfx(SFX_MENU_ENTER)
+                    if buttons[selected] == "Start":
+                        play_bgm(BGM_GAME)
+                        area.layout_game_area()
+                        play_bgm(BGM_MENU)
+                    elif buttons[selected] == "Settings":
+                        settings.layout_setting()
+                    elif buttons[selected] == "Exit":
+                        running = False
 
         if detector.hand_center:
             current_time = pygame.time.get_ticks()
@@ -103,15 +147,24 @@ def layout_menu():
                 last_move_time = current_time
 
             if new_grab and current_time - last_move_time > 300:
-                execute_selection(buttons[selected])
+                play_sfx(SFX_MENU_ENTER)
+                if buttons[selected] == "Start":
+                    play_bgm(BGM_GAME)
+                    area.layout_game_area()
+                    play_bgm(BGM_MENU)
+                elif buttons[selected] == "Settings":
+                    settings.layout_setting()
+                elif buttons[selected] == "Exit":
+                    running = False
                 last_move_time = current_time
         if show_rage_quit_msg:
             elapsed = pygame.time.get_ticks() - rage_quit_timer
             if elapsed < 2000:
-                msg = font.render("😡 Rage quit detected!", True, (255, 0, 0))
+                msg = font.render("Rage quit detected!", True, (255, 0, 0))
                 screen.blit(msg, (SCREEN_WIDTH // 2 - msg.get_width() // 2, 100))
             else:
                 show_rage_quit_msg = False
+                rage_quit_sfx_played = False  # 允许下次rage quit时再次播放
         pygame.display.flip()
         clock.tick(30)
 layout_menu()
