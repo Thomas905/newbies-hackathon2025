@@ -7,6 +7,7 @@ import queue
 
 class HandDetector:
     def __init__(self, max_hands=1, min_detection_confidence=0.7, grab_threshold=0.05, skip_frames=2):
+
         # MediaPipe
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
@@ -21,12 +22,14 @@ class HandDetector:
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
+
         # Variables
         self.grab_threshold = grab_threshold
         self.prev_center = None
         self.hand_center = None
         self.movement = None
         self.is_grab = False
+
         self.lower_hsv = None
         self.upper_hsv = None
         self.skip_frames = skip_frames
@@ -55,6 +58,7 @@ class HandDetector:
         hsv_samples = []
         start_time = time.time()
         while time.time() - start_time < calibration_time:
+
             if self.frame_queue.empty():
                 continue
             frame = self.frame_queue.get()
@@ -84,7 +88,9 @@ class HandDetector:
             self.lower_hsv = np.clip(mean_hsv - tol, 0, 255).astype(np.uint8)
             self.upper_hsv = np.clip(mean_hsv + tol, 0, 255).astype(np.uint8)
             print("Calibration done!")
+
         cv2.destroyWindow("Calibration")
+
 
     def update(self):
         if self.frame_queue.empty():
@@ -107,9 +113,14 @@ class HandDetector:
             h, w, _ = frame.shape
             points = np.array([[int(lm.x * w), int(lm.y * h)] for lm in hand_landmarks.landmark], dtype=np.int32)
 
+
+
+
+
             x, y, w_box, h_box = cv2.boundingRect(points)
             center = (x + w_box // 2, y + h_box // 2)
             self.hand_center = center
+
 
             idx_tip = hand_landmarks.landmark[8]
             thumb_tip = hand_landmarks.landmark[4]

@@ -1,40 +1,27 @@
-from hand_detection import HandDetector 
-from game import GameArea, Settings
-from support import *
+
 import pygame
+import random
+import os.path as path
+
+from support import *
+from character import Player, Peashooter
+from hand_detection import HandDetector
 
 pygame.init()
 
-# Screen
-SCREEN_WIDTH = 450
-SCREEN_HEIGHT = 720
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("NewBies Game")
 clock = pygame.time.Clock()
-font = pygame.font.SysFont("consolas", 32, bold=True)
+font = pygame.font.SysFont(None, 50)
 
-# Colors
-WHITE = (255, 255, 255)
-DARK_GREEN = (34, 139, 34)
-LIGHT_GREEN = (50, 205, 50)
-SHADOW_COLOR = (0, 0, 0, 100)
-SKY_BLUE = (135, 206, 235)
-GRASS_GREEN = (60, 179, 113)
-
-# Button function with shadow
 def basic_button(text, x, y, selected):
-    # Shadow
-    shadow_offset = 6 if selected else 4
-    pygame.draw.rect(screen, (50, 50, 50), (x + shadow_offset, y + shadow_offset, 200, 80), border_radius=15)
-    
-    # Button
-    color = LIGHT_GREEN if selected else DARK_GREEN
-    pygame.draw.rect(screen, color, (x, y, 200, 80), border_radius=15)
-    
-    # Text
+    color = LIGHT_BLUE if selected else BLUE
+    pygame.draw.rect(screen, color, (x, y, 200, 80))
+
     txt = font.render(text, True, WHITE)
     rect = txt.get_rect(center=(x + 100, y + 40))
     screen.blit(txt, rect)
+
 
 detector = HandDetector()
 area = GameArea()
@@ -120,5 +107,10 @@ def layout_menu():
 
         pygame.display.flip()
         clock.tick(30)
+        
+def main():
+    detector = HandDetector()
+    layout_menu(detector)
 
-layout_menu()
+if __name__ == "__main__":
+    main()
