@@ -34,7 +34,7 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         # 初始像素坐标，居中
         self.rect.x = 2 * 75
-        self.rect.y = 30 + 6 * 60
+        self.rect.y = 30 + 8 * 60
         self.health = 100
 
     def update(self):
@@ -65,28 +65,30 @@ class Player(pygame.sprite.Sprite):
 
 # 敌人类
 class Enemy(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, speed=0, bg_offset=0):
         super().__init__()
         image = pygame.image.load(path.join(setting.img_folder,"peashooter_candidate_0.png"))
         self.image = pygame.transform.scale(image,(50,60))
         self.rect = self.image.get_rect()
-        # 随机格子坐标
+        # Random grid position
         self.grid_x = random.randint(0, 5)
-        self.grid_y = random.randint(-6, 0)  # 出生在屏幕外上方和顶端半行
-        self.update_position()
-        self.speedx = 0
-        self.speedy = 0
-        self.out_time = None  # 记录出屏时间
-
-    def update_position(self):
+        self.grid_y = random.randint(-6, 0)
         self.rect.x = 20 + self.grid_x * 75
-        self.rect.y = 5 + self.grid_y * 60
+        self.rect.y = 5 + self.grid_y * 60 + int(bg_offset) % 60
+        self.speedx = 0
+        self.speedy = speed  # enemy speed (pixels/sec)
+        self.out_time = None
+
+    def update_position(self, bg_offset=0):
+        self.rect.x = 20 + self.grid_x * 75
+        self.rect.y = 5 + self.grid_y * 60 + int(bg_offset) % 60
 
     def scroll_with_bg(self, scroll_amount):
         self.rect.y += scroll_amount
 
     def update(self):
-        # Enemy only moves with background scroll (handled externally)
+        # Enemy moves by its own speed (difficulty)
+        self.rect.y += self.speedy / 60  # move per frame
         # Check if out of screen
         if self.rect.top > HEIGHT:
             if self.out_time is None:
@@ -95,7 +97,16 @@ class Enemy(pygame.sprite.Sprite):
                 self.kill()
         else:
             self.out_time = None
-
+    def shoot(self, bullet_speed):
+        bullet = Bullet(self.rect.centerx, self.rect.bottom, bullet_speed, color=RED)
+        all_sprites.add(bullet)
+        bullets.add(bullet)
+    def try_shoot(self, bullet_speed, now):
+        if not hasattr(self, 'last_shoot_time'):
+            self.last_shoot_time = now
+        if now - self.last_shoot_time >= 3:
+            self.shoot(bullet_speed)
+            self.last_shoot_time = now
 class Peashooter(Enemy):
     def __init__(self):
         super().__init__()
@@ -109,20 +120,20 @@ class Peashooter(Enemy):
 
 # 子弹类
 class Bullet(pygame.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, x, y, speedy, color=GREEN):
         super().__init__()
-        self.image = pygame.Surface((10, 20))
-        self.image.fill(GREEN)
+        self.image = pygame.Surface((5, 5))
+        self.image.fill(color)
         self.rect = self.image.get_rect()
         self.rect.centerx = x
-        self.rect.bottom = y
-        self.speedy = -10
-    
+        self.rect.top = y
+        self.speedy = speedy
     def update(self):
         self.rect.y += self.speedy
-        # 如果子弹飞出屏幕顶部，则删除
-        if self.rect.bottom < 0:
+        # 超出屏幕自动销毁
+        if self.rect.top > HEIGHT or self.rect.bottom < 0:
             self.kill()
+
 
 # 创建精灵组
 all_sprites = pygame.sprite.Group()
@@ -153,8 +164,23 @@ bg_img = pygame.transform.scale(bg_img, (WIDTH, HEIGHT))
 bg_y1 = 0
 bg_y2 = -HEIGHT
 BG_SCROLL_SPEED = 60  # 每次滚动的像素
-bg_scroll_speed_per_frame = BG_SCROLL_SPEED / 60  # 每帧滚动像素，假设60fps
-last_scroll_time = time.time()
+
+# --- Difficulty and enemy refresh parameters ---
+BASE_SCROLL_SPEED = 60  # initial scroll speed (pixels/sec)
+BASE_ENEMY_SPEED = 0    # initial enemy speed (pixels/sec)
+BASE_MAX_ENEMIES = 2
+DIFFICULTY_INTERVAL = 1  # seconds per difficulty up
+ENEMY_CHECK_INTERVAL = 2  # seconds per enemy check
+
+difficulty = 0
+scroll_speed = BASE_SCROLL_SPEED
+enemy_speed = BASE_ENEMY_SPEED
+max_enemies = BASE_MAX_ENEMIES
+
+start_time = time.time()
+last_difficulty_time = start_time
+last_enemy_check_time = start_time
+bg_scroll_speed_per_frame = scroll_speed / 60
 
 while running:
     # 保持循环以正确的速度运行
@@ -164,10 +190,24 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        '''
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 player.shoot()
-    
+        '''
+    # --- Difficulty increases every DIFFICULTY_INTERVAL seconds ---
+    now = time.time()
+    if now - last_difficulty_time >= DIFFICULTY_INTERVAL:
+        difficulty += 1
+        max_enemies = BASE_MAX_ENEMIES + difficulty // 10
+        scroll_speed = BASE_SCROLL_SPEED + difficulty
+        enemy_speed = BASE_ENEMY_SPEED + difficulty
+        bg_scroll_speed_per_frame = scroll_speed // 60
+        # 更新所有现存敌人的速度
+        for enemy in enemies:
+            enemy.speedy = enemy_speed
+        last_difficulty_time = now
+
     # Smooth background scroll by pixel per frame
     bg_y1 += bg_scroll_speed_per_frame
     bg_y2 += bg_scroll_speed_per_frame
@@ -179,24 +219,48 @@ while running:
     # Enemies move with background scroll (pixel-based)
     for enemy in enemies:
         enemy.scroll_with_bg(bg_scroll_speed_per_frame)
+
+    # --- Enemy supplement check every ENEMY_CHECK_INTERVAL seconds ---
+    if now - last_enemy_check_time >= ENEMY_CHECK_INTERVAL:
+        missing = max_enemies - len(enemies)
+        for _ in range(missing):
+            if random.random() < 0.5:
+                # 新敌人y坐标与当前背景偏移对齐
+                enemy = Enemy(speed=enemy_speed, bg_offset=bg_y1)
+                all_sprites.add(enemy)
+                enemies.add(enemy)
+        last_enemy_check_time = now
     
-    # 更新
+    # 敌人发射子弹
+    bullet_speed = bg_scroll_speed_per_frame * 2  # 卷轴速度两倍
+    now = time.time()
+    for enemy in enemies:
+        enemy.try_shoot(bullet_speed, now)
+    # Update
     all_sprites.update()
+
+    # Check if bullet hits player (only enemy bullets, i.e. color=RED)
+    for bullet in bullets:
+        if bullet.image.get_at((0,0)) == RED:
+            if player.rect.colliderect(bullet.rect):
+                player.health -= 10
+                bullet.kill()
+
+    # Check if bullet hits enemy (only allow player子弹, 这里假设player子弹为GREEN)
+    hits = pygame.sprite.groupcollide(enemies, bullets, True, False)
+    for enemy, hit_bullets in hits.items():
+        # 只有绿色子弹才算击中敌人
+        for bullet in hit_bullets:
+            if bullet.image.get_at((0,0)) == GREEN:
+                score += 10
+                bullet.kill()
     
-    # 检查子弹是否击中敌人
-    hits = pygame.sprite.groupcollide(enemies, bullets, True, True)
-    for hit in hits:
-        score += 10
-        enemy = Enemy()
-        all_sprites.add(enemy)
-        enemies.add(enemy)
-    
-    # 检查敌人是否撞到玩家
-    hits = pygame.sprite.spritecollide(player, enemies, False)
-    if hits:
-        player.health -= 1
-        if player.health <= 0:
-            running = False
+    # No collision damage between enemies and player
+    # hits = pygame.sprite.spritecollide(player, enemies, False)
+    # if hits:
+    #     player.health -= 1
+    #     if player.health <= 0:
+    #         running = False
     
     # 渲染
     screen.fill(BLACK)
