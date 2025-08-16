@@ -72,30 +72,39 @@ class HandDetector:
                 points = np.array(points, dtype=np.int32)
                 # bounding rect center
                 x, y, w_box, h_box = cv2.boundingRect(points)
-                center = (x + w_box // 2, y + h_box // 2)
+                center = (x // 2, y // 2)
                 self.hand_center = center
-                if self.prev_center:
-                    dx = center[0] - self.prev_center[0]
-                    dy = center[1] - self.prev_center[1]
-                    direction = ""
-                    if abs(dx) > abs(dy):
-                        if dx > 20:
-                            direction = "Left"
-                        elif dx < -20:
-                            direction = "Right"
-                    else:
-                        if dy > 20:
-                            direction = "Down"
-                        elif dy < -20:
-                            direction = "Up"
-                    self.movement = direction if direction else None
-                self.prev_center = center
-                # grab detection
-                idx_tip = hand_landmarks.landmark[8]
-                thumb_tip = hand_landmarks.landmark[4]
+                idx_tip = hand_landmarks.landmark[8]   # Index tip
+                thumb_tip = hand_landmarks.landmark[4] # Pouce tip
+
                 dist = np.sqrt((idx_tip.x - thumb_tip.x) ** 2 + (idx_tip.y - thumb_tip.y) ** 2)
-                self.is_grab = dist < self.grab_threshold
-        return frame
+                
+                if dist < self.grab_threshold:
+                    self.is_grab = True
+                else:
+                    self.is_grab = False
+
+                self.hand_center = center
+                if not self.is_grab:  
+                    if self.prev_center:
+                        dx = center[0] - self.prev_center[0]
+                        dy = center[1] - self.prev_center[1]
+                        direction = ""
+                        if abs(dx) > abs(dy):
+                            if dx > 20:
+                                direction = "Left"
+                            elif dx < -20:
+                                direction = "Right"
+                        else:
+                            if dy > 20:
+                                direction = "Down"
+                            elif dy < -20:
+                                direction = "Up"
+                        self.movement = direction if direction else None
+                else:
+                    self.movement = None
+
+                self.prev_center = center
 
     def release(self):
         self.cap.release()
