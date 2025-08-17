@@ -535,16 +535,18 @@ class Settings:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                elif (event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN) or detector.is_grab:
-                    selected = self.options[self.selected_index]
-                    if selected == "Hand Tracking":
-                        set_mode(ControlMode.HAND)
-                        detector.start_calibration()
-                    elif selected == "Arrow Keys":
-                        set_mode(ControlMode.KEY)
-                    print(f"Mode changé en: {selected}")
-                    
-                    running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_q:
+                        running = False
+                    elif event.key == pygame.K_RETURN or detector.is_grab:
+                        selected = self.options[self.selected_index]
+                        if selected == "Hand Tracking":
+                            set_mode(ControlMode.HAND)
+                            detector.start_calibration()
+                        elif selected == "Arrow Keys":
+                            set_mode(ControlMode.KEY)
+                        print(f"Mode changé en: {selected}")
+                        running = False
 
             if get_mode() == ControlMode.HAND:
                 self.handle_navigation_hand()
