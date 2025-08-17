@@ -3,48 +3,46 @@
 
 ## 🎮 What is this project?
 
-**PVZ: Wrist in Peas** is a wrist-controlled motion game — a vertical scrolling shooter in the style of *space shooters*, but with a playful twist: it's themed after **Plants vs Zombies**.
-
-Each round lasts about **2 minutes**, designed for light wrist activity — perfect as a quick break from typing or gaming marathons.
+**PVZ: Wrist in Peas** is a motion-controlled vertical shooter inspired by *Plants vs Zombies*.  
+You play using your hand gestures, tracked by your webcam — perfect for a quick, healthy break from typing or gaming.
 
 ---
 
 ## 🕹 How to Play
 
-You are **a humble zombie craving brains**, shambling up the lawn. Just like in the original *Plants vs Zombies*, plants form layered defenses.  
-Your goal: **survive** the plant barrage and reach the end of the lawn to enjoy a fresh, delicious brain! 🧠
+You are **a zombie craving brains**, advancing up the lawn while plants try to stop you.  
+Your goal: **survive** the plant barrage and reach the end to enjoy a delicious brain! 🧠
 
-### Controls
+### Gesture Controls
 
 - **Setup:**  
-  Extend your right arm toward your PC screen, **back of the hand facing up**, so your webcam can capture your palm movements.
-  
-- **Move Right:**  
-  Rotate your palm **clockwise** by 90°.
+  Extend one hand toward your PC screen, **back of the hand facing up**, so your webcam can clearly see your palm.
 
-- **Move Left:**  
-  Rotate your palm **counterclockwise** by a smaller angle.
+- **Move:**  
+  Move your hand left, right, up, or down in front of the camera to control your character's movement.
 
-- **Move Up / Down:**  
-  Flex or extend your wrist.
+- **Shoot:**  
+  Pinch your **index finger and thumb together** to fire a projectile. Hold the pinch for rapid fire (with a cooldown).
 
-- **(Optional) Special Skill:**  
-  If stamina allows, we plan to add a custom gesture for skill activation  
-  *(e.g., middle finger salute — though more likely a simple fist ✊)*.
+- **Special Exit Gesture (Easter Egg):**  
+  Show your **middle finger** to the camera to instantly trigger a rage quit — the game will exit with a special sound and message.
 
 ---
 
 ## 💡 Health Note
-The motion control is designed for **short bursts of gentle wrist activity**, helping keep joints mobile and reducing stiffness from prolonged computer use.
+
+This game is designed for **short bursts of gentle wrist and hand movement**, helping keep your joints mobile and reducing stiffness from long computer sessions.
 
 ---
 
-## 🛠 Tech Stack(TBD)
-- **Platform:** Webapp? 
-- **Control:** Webcam hand tracking (MediaPipe Hands)
-- **Style:** Parody of *Plants vs Zombies* with arcade space shooter mechanics
+## 🛠 Tech Stack
+
+- **Platform:** Desktop (Python + Pygame)
+- **Hand Tracking:** MediaPipe Hands + OpenCV
+- **Style:** Parody of *Plants vs Zombies* with arcade shooter mechanics
 
 ---
 
 ## 📜 Credits
-Made during a hackathon, with love, laughs, and slightly sore wrists.
+
+Made during a hackathon, with love, laughs, and healthy
