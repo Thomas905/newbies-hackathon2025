@@ -19,6 +19,9 @@ SFX_MENU_ENTER = path.join(setting.snd_folder, "menu_enter.mp3")
 SFX_MENU_SWITCH_ON = path.join(setting.snd_folder, "menu_switch_on.mp3")
 SFX_MENU_SWITCH_OFF = path.join(setting.snd_folder, "menu_switch_off.mp3")
 SFX_QUIT = path.join(setting.snd_folder, "quit.mp3")  # 新增：退出音效
+SFX_BOOM = path.join(setting.snd_folder, "cherrybomb.mp3")  # 新增：爆炸音效
+SFX_ROLLER = path.join(setting.snd_folder, "roller.mp3")  # 新增：bomb 0音效
+SFX_DIE = path.join(setting.snd_folder, "die.mp3")  # 新增：死亡音效
 
 # Globals & Create sprite groups
 all_sprites = pygame.sprite.Group()
@@ -207,13 +210,13 @@ class Player(pygame.sprite.Sprite):
                         py_img = pygame.transform.scale(py_img, self.image.get_size())
                         self.death_frames.append(py_img)
                 except Exception:
-                    # 失败则用静态图
                     self.death_frames = [pygame.transform.scale(pygame.image.load(dead_img_path), self.image.get_size())]
             if self.death_frames:
                 self.image = self.death_frames[0]
                 self.death_frame_idx = 0
                 self.death_frame_time = pygame.time.get_ticks()
                 self.is_playing_death = True
+            play_sfx(SFX_DIE)  # 新增：死亡音效
             self.dead = True
 
 # Enemy class
@@ -362,9 +365,15 @@ class Bomb(pygame.sprite.Sprite):
         self.explode_duration = 0.2
         self.explode_start = None
         self.has_exploded = False
+        self.warn_sound_played = False  # 新增：用于控制warn音效只播放一次
 
     def update(self):
         now = time.time()
+        # warn阶段音效
+        if not self.warn_sound_played:
+            if self.damage_type == 0:
+                play_sfx(SFX_ROLLER)
+            self.warn_sound_played = True
         if self.state == "warning":
             if now - self.start_time >= self.warning_time:
                 self.state = "explode"
@@ -386,7 +395,7 @@ class Bomb(pygame.sprite.Sprite):
                         dy = self.player.rect.centery - self.y
                         if dx*dx + dy*dy < self.radius*self.radius:
                             self.player.hp -= 2
-                            # 不再调用 self.player.kill() 或 GameArea.running = False
+                        play_sfx(SFX_BOOM)  # bomb 1 爆炸音效
                     self.has_exploded = True
         elif self.state == "explode":
             if now - self.explode_start > self.explode_duration:
