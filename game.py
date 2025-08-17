@@ -348,6 +348,8 @@ class GameArea:
                         if current_time - last_shoot_time > shoot_cooldown:
                             player.shoot()
                             last_shoot_time = current_time
+                    if event.key == pygame.K_q or event.key == pygame.K_ESCAPE:
+                        running = False
             
             if ControlMode.HAND and detector.is_grab:
                 if current_time - last_shoot_time > shoot_cooldown:
