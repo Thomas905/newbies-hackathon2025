@@ -481,6 +481,11 @@ class GameArea:
 
         last_bomb_time = 0  # 新增：用于炸弹冷却计时
         last_auto_shoot_time = 0  # 用于自动射击计时
+        last_grab_shoot_time = 0  # 新增：用于grab射击冷却
+
+        grab_shoot_cooldown = 500  # ms，grab射击冷却
+
+        last_grab_state = False  # 新增：记录上帧grab状态
 
         while running:
             # Keep loop running at the right speed
@@ -502,12 +507,21 @@ class GameArea:
 
             current_time = pygame.time.get_ticks()
 
-            if ControlMode.HAND and detector.is_grab:
-                player.release_bomb(bomb_scale=1.3)
+            # grab手势射击逻辑
+            if ControlMode.HAND:
+                if detector.is_grab:
+                    if not last_grab_state:
+                        # 点按grab，立刻射击
+                        player.shoot()
+                        last_grab_shoot_time = current_time
+                    else:
+                        # 持续grab，需冷却
+                        if current_time - last_grab_shoot_time > grab_shoot_cooldown:
+                            player.shoot()
+                            last_grab_shoot_time = current_time
+                # 更新last_grab_state
+                last_grab_state = detector.is_grab
 
-            if detector.is_fuck:
-                running = False
-        
             # --- Difficulty increases every DIFFICULTY_INTERVAL seconds ---
             now = time.time()
             if now - last_difficulty_time >= DIFFICULTY_INTERVAL:
@@ -693,7 +707,7 @@ class Settings:
                 set_mode(ControlMode.HAND)
             elif selected == "Arrow Keys":
                 set_mode(ControlMode.KEY)
-            print(f"Mode changé en: {selected}")
+            print(f"Mode changed to: {selected}")
             return True
         return False
 
