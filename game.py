@@ -115,13 +115,21 @@ class Player(pygame.sprite.Sprite):
             detector.update()
             if detector.hand_center:
                 hand_x, hand_y = detector.hand_center
-                hand_x = screen.get_width() - hand_x  
-                self.rect.centerx = hand_x
-                self.rect.centery = hand_y
+
+                screen_w, screen_h = screen.get_size()
+                cam_w, cam_h = 640, 480 
+
+                mapped_x = hand_x * screen_w / cam_w
+                mapped_y = hand_y * screen_h / cam_h
+
+                mapped_x = screen_w - mapped_x
+
+                self.rect.centerx = mapped_x
+                self.rect.centery = mapped_y
 
         elif get_mode() == ControlMode.KEY:
             keys = pygame.key.get_pressed()
-            speed = 5  # vitesse de déplacement
+            speed = 5  
             if keys[pygame.K_LEFT]:
                 self.rect.x -= speed
             if keys[pygame.K_RIGHT]:
@@ -131,7 +139,6 @@ class Player(pygame.sprite.Sprite):
             if keys[pygame.K_DOWN]:
                 self.rect.y += speed
 
-        # 动画帧切换
         now = pygame.time.get_ticks()
         if now - self.frame_time > self.frame_interval:
             self.frame_idx = (self.frame_idx + 1) % len(self.frames)
@@ -144,7 +151,6 @@ class Player(pygame.sprite.Sprite):
         bullet = PlayerBullet(self.rect.centerx, self.rect.top, 5)
         all_sprites.add(bullet)
         bullets_0.add(bullet)
-        # play_sfx(SFX_SHOOT)  # 子弹射出音效
 
 # Enemy class
 class Enemy(pygame.sprite.Sprite):
