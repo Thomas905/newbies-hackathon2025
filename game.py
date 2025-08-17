@@ -75,6 +75,25 @@ def play_sfx(sfx_path):
         except Exception:
             pass
 
+def basic_button(text, x, y, selected):
+    width, height = 245, 90
+
+    button_surf = pygame.Surface((width, height), pygame.SRCALPHA)
+
+    border_color = (100, 255, 100, 180) if selected else (50, 150, 50, 120)
+
+    bg_color = (0, 100, 0, 80) if selected else (0, 50, 0, 60)
+
+    pygame.draw.rect(button_surf, bg_color, (0, 0, width, height), border_radius=15)
+
+    pygame.draw.rect(button_surf, border_color, (0, 0, width, height), width=3, border_radius=15)
+
+    txt = font.render(text, True, (255, 255, 255))
+    rect = txt.get_rect(center=(width // 2, height // 2))
+    button_surf.blit(txt, rect)
+
+    screen.blit(button_surf, (x, y))
+
 # Player sprite
 class Player(pygame.sprite.Sprite):
     def __init__(self):
@@ -517,45 +536,110 @@ class Settings:
         clock = pygame.time.Clock()
         running = True
 
+        menu_bg = pygame.image.load("assets/images/Background/background.png").convert()
+        menu_bg = pygame.transform.scale(menu_bg, (WIDTH, HEIGHT))
+
+        last_move_time = 0
+        last_grab = False
+        show_rage_quit_msg = False
+        rage_quit_timer = 0
+        rage_quit_sfx_played = False
+
         while running:
-            screen.fill(BG_COLOR)
+            screen.blit(menu_bg, (0, 0))
             detector.update()
 
-            title = font.render("⚙ SETTINGS ⚙", True, HIGHLIGHT)
+            # Titre
+            title = font.render("SETTINGS", True, HIGHLIGHT)
             screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 60))
 
+            # Positions des boutons
+            btn_positions = [200 + i * 115 for i in range(len(self.options))]
             for i, opt in enumerate(self.options):
-                color = HIGHLIGHT if i == self.selected_index else NORMAL
-                text = font.render(opt, True, color)
-                shadow = font.render(opt, True, (color[0] // 3, color[1] // 3, color[2] // 3))
-                y = 200 + i * 100
-                screen.blit(shadow, (WIDTH // 2 - shadow.get_width() // 2 + 4, y + 4))
-                screen.blit(text, (WIDTH // 2 - text.get_width() // 2, y))
+                selected = (i == self.selected_index)
+                basic_button(opt, 100, btn_positions[i], selected)
 
+            # Détection grab
+            new_grab = detector.is_grab and not last_grab and detector.hand_center
+            last_grab = detector.is_grab
+
+            # Événements clavier
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE or event.key == pygame.K_q:
                         running = False
-                    elif event.key == pygame.K_RETURN or detector.is_grab:
+                    elif event.key == pygame.K_DOWN:
+                        self.selected_index = (self.selected_index + 1) % len(self.options)
+                        play_sfx(SFX_MENU_SWITCH_OFF)
+                    elif event.key == pygame.K_UP:
+                        self.selected_index = (self.selected_index - 1) % len(self.options)
+                        play_sfx(SFX_MENU_SWITCH_ON)
+                    elif event.key == pygame.K_RETURN:
+                        play_sfx(SFX_MENU_ENTER)
                         selected = self.options[self.selected_index]
+
                         if selected == "Hand Tracking":
-                            set_mode(ControlMode.HAND)
-                            detector.start_calibration()
+                            if get_mode() != ControlMode.HAND:
+                                set_mode(ControlMode.HAND)
+                                detector.start_calibration()
+                                running = False
                         elif selected == "Arrow Keys":
                             set_mode(ControlMode.KEY)
-                        print(f"Mode changé en: {selected}")
-                        running = False
+                            running = False
 
-            if get_mode() == ControlMode.HAND:
-                self.handle_navigation_hand()
-            elif get_mode() == ControlMode.KEY:
-                self.handle_navigation_key()
-            
-            if detector.is_fuck:
-                running = False
+                        print(f"Mode changé en: {selected}")
+
+            # Navigation main
+            if get_mode() == ControlMode.HAND and detector.hand_center:
+                current_time = pygame.time.get_ticks()
+
+                # Navigation haut/bas
+                if detector.movement and current_time - last_move_time > 300:
+                    if detector.movement == "Down":
+                        self.selected_index = (self.selected_index + 1) % len(self.options)
+                        play_sfx(SFX_MENU_SWITCH_OFF)
+                    elif detector.movement == "Up":
+                        self.selected_index = (self.selected_index - 1) % len(self.options)
+                        play_sfx(SFX_MENU_SWITCH_ON)
+                    last_move_time = current_time
+
+                # Validation grab
+                if new_grab and current_time - last_move_time > 300:
+                    play_sfx(SFX_MENU_ENTER)
+                    selected = self.options[self.selected_index]
+
+                    if selected == "Hand Tracking":
+                        if get_mode() != ControlMode.HAND:
+                            set_mode(ControlMode.HAND)
+                            detector.start_calibration()
+                            running = False  # seulement si on change de mode
+                        else:
+                            print("Mode HAND déjà actif")  # ne ferme pas le menu
+                    elif selected == "Arrow Keys":
+                        set_mode(ControlMode.KEY)
+                        running = False  # fermeture normale après changement de mode
+
+                    last_move_time = current_time
+
+            # Gestion rage quit
+            if getattr(detector, "is_fuck", False):
+                show_rage_quit_msg = True
+                rage_quit_timer = pygame.time.get_ticks()
+                detector.is_fuck = False
+                if not rage_quit_sfx_played:
+                    play_sfx(SFX_QUIT)
+                    rage_quit_sfx_played = True
+
+            if show_rage_quit_msg:
+                elapsed = pygame.time.get_ticks() - rage_quit_timer
+                if elapsed < 6000:
+                    msg = font.render("You leave setting screen", True, (255, 0, 0))
+                    screen.blit(msg, (WIDTH // 2 - msg.get_width() // 2, 100))
+                else:
+                    show_rage_quit_msg = False
+                    rage_quit_sfx_played = False  
 
             pygame.display.flip()
             clock.tick(30)
-
