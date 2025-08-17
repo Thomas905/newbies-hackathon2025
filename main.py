@@ -7,7 +7,6 @@ import os.path as path
 import sys
 
 snd_folder = path.join("entity", "snd")
-# 声音文件变量
 BGM_MENU = path.join(snd_folder, "bgm_menu.mp3")
 BGM_GAME = path.join(snd_folder, "bgm_game.mp3")
 SFX_MENU_ENTER = path.join(snd_folder, "menu_enter.mp3")
@@ -48,20 +47,24 @@ SHADOW_COLOR = (0, 0, 0, 100)
 SKY_BLUE = (135, 206, 235)
 GRASS_GREEN = (60, 179, 113)
 
-# Button function with shadow
 def basic_button(text, x, y, selected):
-    # Shadow
-    shadow_offset = 6 if selected else 4
-    pygame.draw.rect(screen, (50, 50, 50), (x + shadow_offset, y + shadow_offset, 200, 80), border_radius=15)
-    
-    # Button
-    color = LIGHT_GREEN if selected else DARK_GREEN
-    pygame.draw.rect(screen, color, (x, y, 200, 80), border_radius=15)
-    
-    # Text
-    txt = font.render(text, True, WHITE)
-    rect = txt.get_rect(center=(x + 100, y + 40))
-    screen.blit(txt, rect)
+    width, height = 245, 90
+
+    button_surf = pygame.Surface((width, height), pygame.SRCALPHA)
+
+    border_color = (100, 255, 100, 180) if selected else (50, 150, 50, 120)
+
+    bg_color = (0, 100, 0, 80) if selected else (0, 50, 0, 60)
+
+    pygame.draw.rect(button_surf, bg_color, (0, 0, width, height), border_radius=15)
+
+    pygame.draw.rect(button_surf, border_color, (0, 0, width, height), width=3, border_radius=15)
+
+    txt = font.render(text, True, (255, 255, 255))
+    rect = txt.get_rect(center=(width // 2, height // 2))
+    button_surf.blit(txt, rect)
+
+    screen.blit(button_surf, (x, y))
 
 detector = HandDetector()
 area = GameArea()
@@ -77,16 +80,21 @@ def execute_selection(choice):
         sys.exit()
 
 def layout_menu():
-    play_bgm(BGM_MENU)
     running = True
     selected = 0
     buttons = ["Start", "Settings", "Exit"]
-    last_move_time = 0 
+    last_move_time = 0
     last_grab = False
     current_mode = get_mode()
+
     show_rage_quit_msg = False
     rage_quit_timer = 0
-    rage_quit_sfx_played = False  # 新增变量，防止多次播放
+    rage_quit_sfx_played = False
+
+    menu_bg = pygame.image.load("assets/images/Background/background.png").convert()
+    menu_bg = pygame.transform.scale(menu_bg, (SCREEN_WIDTH, SCREEN_HEIGHT))
+
+    btn_positions = [200, 315, 428]  
 
     if current_mode == ControlMode.HAND:
         detector.enabled = False
@@ -95,15 +103,14 @@ def layout_menu():
 
     while running:
         # Background
-        screen.fill(SKY_BLUE)
-        pygame.draw.rect(screen, GRASS_GREEN, (0, SCREEN_HEIGHT // 2, SCREEN_WIDTH, SCREEN_HEIGHT // 2))
+        screen.blit(menu_bg, (0, 0))
 
         if getattr(detector, "enabled", True):
             detector.update()
             if getattr(detector, "is_fuck", False):
                 show_rage_quit_msg = True
                 rage_quit_timer = pygame.time.get_ticks()
-                detector.is_fuck = False 
+                detector.is_fuck = False
                 if not rage_quit_sfx_played:
                     play_sfx(SFX_QUIT)
                     rage_quit_sfx_played = True
@@ -112,14 +119,12 @@ def layout_menu():
         last_grab = detector.is_grab
 
         for i, btn in enumerate(buttons):
-            basic_button(btn, 125, 250 + i * 120, selected == i)
+            basic_button(btn, 100, btn_positions[i], selected == i)
 
-        # Event handling
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            # if mode == ControlMode.KEY and event.type == pygame.KEYDOWN:
-            if event.type == pygame.KEYDOWN:
+            elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_DOWN:
                     selected = (selected + 1) % len(buttons)
                     play_sfx(SFX_MENU_SWITCH_OFF)
@@ -159,12 +164,15 @@ def layout_menu():
                 last_move_time = current_time
         if show_rage_quit_msg:
             elapsed = pygame.time.get_ticks() - rage_quit_timer
-            if elapsed < 2000:
-                msg = font.render("Rage quit detected!", True, (255, 0, 0))
+
+            if elapsed < 6000:
+                msg = font.render("Rage quit detected !", True, (255, 0, 0))
                 screen.blit(msg, (SCREEN_WIDTH // 2 - msg.get_width() // 2, 100))
             else:
                 show_rage_quit_msg = False
-                rage_quit_sfx_played = False  # 允许下次rage quit时再次播放
+                rage_quit_sfx_played = False  
+
         pygame.display.flip()
         clock.tick(30)
+
 layout_menu()

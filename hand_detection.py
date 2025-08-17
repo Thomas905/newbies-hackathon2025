@@ -109,18 +109,15 @@ class HandDetector:
             h, w, _ = frame.shape
             points = np.array([[int(lm.x * w), int(lm.y * h)] for lm in hand_landmarks.landmark], dtype=np.int32)
 
-            # centre main
             x, y, w_box, h_box = cv2.boundingRect(points)
             center = (x + w_box // 2, y + h_box // 2)
             self.hand_center = center
 
-            # grab (pouce/index)
             idx_tip = hand_landmarks.landmark[8]
             thumb_tip = hand_landmarks.landmark[4]
             dist = np.sqrt((idx_tip.x - thumb_tip.x) ** 2 + (idx_tip.y - thumb_tip.y) ** 2)
             self.is_grab = dist < self.grab_threshold
 
-            # fuck gesture (majeur levé, autres doigts pliés)
             lm = [(int(pt.x * w), int(pt.y * h)) for pt in hand_landmarks.landmark]
             idx_tip, idx_mcp = lm[8], lm[6]
             mid_tip, mid_mcp = lm[12], lm[10]

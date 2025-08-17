@@ -145,7 +145,6 @@ class Player(pygame.sprite.Sprite):
         self.rect.clamp_ip(screen.get_rect())
 
     def shoot(self):
-        # 玩家发射子弹，速度等于卷轴速度，0.5s自毁
         bullet = PlayerBullet(self.rect.centerx, self.rect.top, 5)
         all_sprites.add(bullet)
         bullets_0.add(bullet)
@@ -432,19 +431,26 @@ class GameArea:
             clock.tick(60)
     
             detector.update()
+
+            current_time = pygame.time.get_ticks()
             
             # Handle input events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                if event.type == pygame.KEYDOWN and ControlMode.KEY:
+                    if event.key == pygame.K_SPACE:
+                        if current_time - last_shoot_time > shoot_cooldown:
+                            player.shoot()
+                            last_shoot_time = current_time
             
+
             current_time = pygame.time.get_ticks()
 
-            if detector.is_grab:
-                player.release_bomb()
-            if current_time - last_shoot_time >= shoot_cooldown:
-                player.shoot()
-                last_shoot_time = current_time
+            if ControlMode.HAND and detector.is_grab:
+                if current_time - last_shoot_time >= shoot_cooldown:
+                    player.shoot()
+                    last_shoot_time = current_time
 
             if detector.is_fuck:
                 running = False
@@ -569,12 +575,17 @@ class GameArea:
                 screen.blit(e["image"], e["rect"])
 
             # Display score
-            score_text = font.render(f"score: {score}", True, WHITE)
-            screen.blit(score_text, (10, 10))
+            coin_image = pygame.image.load("assets/images/Customs/coin.png") 
+            coin_image = pygame.transform.scale(coin_image, (40, 40))
+            score_text = font.render(f"{score}", True, WHITE)
+            screen.blit(score_text, (20, 10))
+            screen.blit(coin_image, (10 + score_text.get_width() + 10, 3))
             
             # Display hp
-            hp_text = font.render(f"hp: {player.hp}", True, WHITE)
-            screen.blit(hp_text, (10, 50))
+            heart_image = pygame.image.load("assets/images/Customs/Heart.png") 
+            heart_image = pygame.transform.scale(heart_image, (40, 40))
+            for i in range(player.hp):
+                screen.blit(heart_image, (10 + i * 50, 50))
             
             # Refresh screen
             pygame.display.flip()
@@ -653,6 +664,7 @@ class Settings:
                     selected = self.options[self.selected_index]
                     if selected == "Hand Tracking":
                         set_mode(ControlMode.HAND)
+                        detector.start_calibration()
                     elif selected == "Arrow Keys":
                         set_mode(ControlMode.KEY)
                     print(f"Mode changé en: {selected}")
@@ -663,6 +675,9 @@ class Settings:
                 self.handle_navigation_hand()
             elif get_mode() == ControlMode.KEY:
                 self.handle_navigation_key()
+            
+            if detector.is_fuck:
+                running = False
 
             pygame.display.flip()
             clock.tick(30)
