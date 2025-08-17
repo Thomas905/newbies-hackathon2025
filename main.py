@@ -35,7 +35,7 @@ def play_sfx(sfx_path):
 SCREEN_WIDTH = 450
 SCREEN_HEIGHT = 720
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("NewBies Game")
+pygame.display.set_caption("Wrist in Peas")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont("consolas", 32, bold=True)
 
