@@ -35,7 +35,7 @@ def play_sfx(sfx_path):
 SCREEN_WIDTH = 450
 SCREEN_HEIGHT = 720
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("NewBies Game")
+pygame.display.set_caption("Wrist in Peas")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont("consolas", 32, bold=True)
 
@@ -162,6 +162,7 @@ def layout_menu():
                 elif buttons[selected] == "Exit":
                     running = False
                 last_move_time = current_time
+
         if show_rage_quit_msg:
             elapsed = pygame.time.get_ticks() - rage_quit_timer
 

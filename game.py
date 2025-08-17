@@ -18,12 +18,17 @@ SFX_HIT = path.join(setting.snd_folder, "hit.mp3")
 SFX_MENU_ENTER = path.join(setting.snd_folder, "menu_enter.mp3")
 SFX_MENU_SWITCH_ON = path.join(setting.snd_folder, "menu_switch_on.mp3")
 SFX_MENU_SWITCH_OFF = path.join(setting.snd_folder, "menu_switch_off.mp3")
+SFX_QUIT = path.join(setting.snd_folder, "quit.mp3")  # 新增：退出音效
+SFX_BOOM = path.join(setting.snd_folder, "cherrybomb.mp3")  # 新增：爆炸音效
+SFX_ROLLER = path.join(setting.snd_folder, "roller.mp3")  # 新增：bomb 0音效
+SFX_DIE = path.join(setting.snd_folder, "die.mp3")  # 新增：死亡音效
 
 # Globals & Create sprite groups
 all_sprites = pygame.sprite.Group()
 enemies = pygame.sprite.Group()
 bullets_0 = pygame.sprite.Group()
 bullets_1 = pygame.sprite.Group()
+bombs = pygame.sprite.Group()  # 新增：用于管理所有炸弹
 
 playing_mode_set = 0
 
@@ -31,6 +36,10 @@ playing_mode_set = 0
 WIDTH = 450
 HEIGHT = 720
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
+
+# 全局常量
+bomb_cooldown = 2000  # ms
 
 # 设置窗口icon
 icon_path = path.join(setting.img_folder, "icon.png")
@@ -128,8 +137,28 @@ class Player(pygame.sprite.Sprite):
         self.hp = 5
         self.last_shoot_time = 0
         self.cd_hint = False  # Whether to show "CD" above player
+        self.last_bomb_time = 0  # 新增：炸弹冷却
+        self.dead = False  # 新增：死亡状态
+        self.death_frames = []  # 死亡gif帧
+        self.death_frame_idx = 0
+        self.death_frame_time = 0
+        self.death_frame_interval = 100  # 死亡gif帧间隔(ms)
+        self.is_playing_death = False
 
     def update(self):
+        # 死亡动画优先
+        if self.is_playing_death and self.death_frames:
+            now = pygame.time.get_ticks()
+            if now - self.death_frame_time > self.death_frame_interval:
+                self.death_frame_idx += 1
+                if self.death_frame_idx >= len(self.death_frames):
+                    self.death_frame_idx = len(self.death_frames) - 1  # 停留在最后一帧
+                self.image = self.death_frames[self.death_frame_idx]
+                self.death_frame_time = now
+            # 死亡动画期间不再切换普通动画
+            self.rect.clamp_ip(screen.get_rect())
+            return
+
         if get_mode() == ControlMode.HAND:
             detector.update()
             if detector.hand_center:
@@ -170,6 +199,50 @@ class Player(pygame.sprite.Sprite):
         bullet = PlayerBullet(self.rect.centerx, self.rect.top, 5)
         all_sprites.add(bullet)
         bullets_0.add(bullet)
+
+    def release_bomb(self, bomb_scale=1.0):
+        now = pygame.time.get_ticks()
+        if now - self.last_bomb_time > bomb_cooldown:
+            bomb_x = self.rect.centerx
+            bomb_y = self.rect.centery - 60
+            warning_img_path = path.join(setting.img_folder, "bomb_warning_0.png")
+            explode_img_path = path.join(setting.img_folder, "bomb_explode_0.png")
+            base_radius = 50
+            bomb = Bomb(
+                bomb_x, bomb_y, player=self, enemies=enemies, damage_type=0,
+                warning_time=0.5, radius=int(base_radius * bomb_scale),
+                warning_img_path=warning_img_path,
+                explode_img_path=explode_img_path
+            )
+            all_sprites.add(bomb)
+            bombs.add(bomb)
+            self.last_bomb_time = now
+
+    def set_dead(self):
+        if not self.dead:
+            dead_img_path = path.join(setting.img_folder, "ZombieDie.gif")
+            self.death_frames = []
+            if os.path.exists(dead_img_path):
+                try:
+                    import PIL.Image
+                    pil_img = PIL.Image.open(dead_img_path)
+                    for frame in range(0, pil_img.n_frames):
+                        pil_img.seek(frame)
+                        frame_img = pil_img.convert("RGBA")
+                        raw_str = frame_img.tobytes()
+                        size = frame_img.size
+                        py_img = pygame.image.frombuffer(raw_str, size, "RGBA")
+                        py_img = pygame.transform.scale(py_img, self.image.get_size())
+                        self.death_frames.append(py_img)
+                except Exception:
+                    self.death_frames = [pygame.transform.scale(pygame.image.load(dead_img_path), self.image.get_size())]
+            if self.death_frames:
+                self.image = self.death_frames[0]
+                self.death_frame_idx = 0
+                self.death_frame_time = pygame.time.get_ticks()
+                self.is_playing_death = True
+            play_sfx(SFX_DIE)  # 新增：死亡音效
+            self.dead = True
 
 # Enemy class
 class Enemy(pygame.sprite.Sprite):
@@ -288,9 +361,80 @@ class EnemyBullet(Bullet):
             self.rect.top = y
         else:
             super().__init__(x, y, 0, speedY, damage_type=1, color=RED, size=(9, 9))
+class Bomb(pygame.sprite.Sprite):
+    def __init__(self, x, y, player, enemies, damage_type=0, warning_time=1.5, radius=60, 
+                 warning_img_path=None, explode_img_path=None):
+        super().__init__()
+        self.x = x
+        self.y = y
+        self.radius = radius
+        self.warning_time = warning_time
+        self.start_time = time.time()
+        self.state = "warning"
+        self.damage_type = damage_type
+        self.player = player
+        self.enemies = enemies
+        # 贴图路径
+        self.warning_img = pygame.Surface((int(radius*1.0), int(radius*1.0)), pygame.SRCALPHA)
+        self.explode_img = pygame.Surface((int(radius*2), int(radius*2)), pygame.SRCALPHA)
+        if warning_img_path and os.path.exists(warning_img_path):
+            self.warning_img = pygame.transform.scale(
+                pygame.image.load(warning_img_path), (int(radius*1.0), int(radius*1.0))
+            )
+        if explode_img_path and os.path.exists(explode_img_path):
+            self.explode_img = pygame.transform.scale(
+                pygame.image.load(explode_img_path), (int(radius*2), int(radius*2))
+            )
+        self.image = self.warning_img
+        self.rect = self.image.get_rect(center=(x, y))
+        self.explode_duration = 0.2
+        self.explode_start = None
+        self.has_exploded = False
+        self.warn_sound_played = False  # 新增：用于控制warn音效只播放一次
+
+    def update(self):
+        now = time.time()
+        # warn阶段音效
+        if not self.warn_sound_played:
+            if self.damage_type == 0:
+                play_sfx(SFX_ROLLER)
+            self.warn_sound_played = True
+        if self.state == "warning":
+            if now - self.start_time >= self.warning_time:
+                self.state = "explode"
+                self.image = self.explode_img
+                self.rect = self.image.get_rect(center=(self.x, self.y))
+                self.explode_start = now
+                # 只在爆炸瞬间检测一次
+                if not self.has_exploded:
+                    if self.damage_type == 0:
+                        # 伤害敌人
+                        for target in list(self.enemies):
+                            dx = target.rect.centerx - self.x
+                            dy = target.rect.centery - self.y
+                            if dx*dx + dy*dy < self.radius*self.radius:
+                                target.kill()
+                    elif self.damage_type == 1:
+                        # 伤害玩家
+                        dx = self.player.rect.centerx - self.x
+                        dy = self.player.rect.centery - self.y
+                        if dx*dx + dy*dy < self.radius*self.radius:
+                            self.player.hp -= 2
+                        play_sfx(SFX_BOOM)  # bomb 1 爆炸音效
+                    self.has_exploded = True
+        elif self.state == "explode":
+            if now - self.explode_start > self.explode_duration:
+                self.kill()
 
 class GameArea:
     def layout_game_area(self):
+        # 清空所有sprite组，防止旧尸体残留
+        all_sprites.empty()
+        enemies.empty()
+        bullets_0.empty()
+        bullets_1.empty()
+        bombs.empty()
+
         play_bgm(BGM_GAME)  # 进入游戏切换BGM
         play_sfx(SFX_START)
         # Create player
@@ -334,9 +478,8 @@ class GameArea:
         last_difficulty_time = start_time
         last_enemy_check_time = start_time
         bg_scroll_speed_per_frame = scroll_speed / 60
-        
-        shoot_cooldown = 200
-        last_shoot_time = 0
+
+
 
         effects = []  # 用于存储爆炸视觉效果
 
@@ -356,6 +499,19 @@ class GameArea:
             except Exception:
                 pea_hit_img = None
 
+        last_bomb_check_time = time.time()  # 新增：上次敌方炸弹生成时间
+
+        dead_time = None  # 新增：记录死亡时间
+        quit_sound_played = False  # 新增：只播放一次死亡音效
+
+        last_bomb_time = 0  # 新增：用于炸弹冷却计时
+        last_auto_shoot_time = 0  # 用于自动射击计时
+        last_grab_shoot_time = 0  # 新增：用于grab射击冷却
+
+        grab_shoot_cooldown = 500  # ms，grab射击冷却
+
+        last_grab_state = False  # 新增：记录上帧grab状态
+
         while running:
             # Keep loop running at the right speed
             clock.tick(60)
@@ -370,20 +526,28 @@ class GameArea:
                     running = False
                 if event.type == pygame.KEYDOWN and ControlMode.KEY:
                     if event.key == pygame.K_SPACE:
-                        if current_time - last_shoot_time > shoot_cooldown:
-                            player.shoot()
-                            last_shoot_time = current_time
+
+                        player.release_bomb(bomb_scale=1.3)
                     if event.key == pygame.K_q or event.key == pygame.K_ESCAPE:
                         running = False
-            
-            if ControlMode.HAND and detector.is_grab:
-                if current_time - last_shoot_time > shoot_cooldown:
-                    player.shoot()
-                    last_shoot_time = current_time
 
-            if detector.is_fuck:
-                running = False
-        
+            current_time = pygame.time.get_ticks()
+
+            # grab手势射击逻辑
+            if ControlMode.HAND:
+                if detector.is_grab:
+                    if not last_grab_state:
+                        # 点按grab，立刻射击
+                        player.shoot()
+                        last_grab_shoot_time = current_time
+                    else:
+                        # 持续grab，需冷却
+                        if current_time - last_grab_shoot_time > grab_shoot_cooldown:
+                            player.shoot()
+                            last_grab_shoot_time = current_time
+                # 更新last_grab_state
+                last_grab_state = detector.is_grab
+
             # --- Difficulty increases every DIFFICULTY_INTERVAL seconds ---
             now = time.time()
             if now - last_difficulty_time >= DIFFICULTY_INTERVAL:
@@ -442,8 +606,7 @@ class GameArea:
                         })
                     play_sfx(SFX_HIT)  # 播放击中音效
                     bullet.kill()
-                    if player.hp <= 0:
-                        running = False
+                    # 不再在这里处理死亡流程
 
             # 检查玩家子弹击中敌人
             hits = pygame.sprite.groupcollide(enemies, bullets_0, True, False)
@@ -459,6 +622,38 @@ class GameArea:
                         })
                     play_sfx(SFX_HIT)  # 播放击中音效
                     bullet.kill()
+
+            # 玩家手势释放炸弹（假设用 detector.is_open_palm 触发，可根据实际手势调整）
+            # 这里以按空格键为例，也可用手势
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_SPACE]:
+                player.release_bomb(bomb_scale=1.3)
+
+            # 每隔1s检定一次，35%概率生成伤害类型为1的bomb
+            now_time = time.time()
+            if now_time - last_bomb_check_time >= 1.5:
+                if random.random() < 0.35:
+                    # 生成坐标为player中心xy+-30
+                    px, py = player.rect.centerx, player.rect.centery
+                    bomb_x = px + random.choice([-30, 30])
+                    bomb_y = py + random.choice([-30, 30])
+                    warning_img_path = path.join(setting.img_folder, "bomb_warning_1.gif")
+                    explode_img_path = path.join(setting.img_folder, "bomb_explode_1.gif")
+                    bomb = Bomb(
+                        bomb_x, bomb_y, player=player, enemies=enemies, damage_type=1,
+                        warning_time=0.3, radius=50,
+                        warning_img_path=warning_img_path,
+                        explode_img_path=explode_img_path
+                    )
+                    all_sprites.add(bomb)
+                    bombs.add(bomb)
+                last_bomb_check_time = now_time
+
+            # 自动每2.5s射击一次
+            now = pygame.time.get_ticks()
+            if now - last_auto_shoot_time > 2500:
+                player.shoot()
+                last_auto_shoot_time = now
 
             # Render
             screen.fill(BLACK)
@@ -487,6 +682,18 @@ class GameArea:
             
             # Refresh screen
             pygame.display.flip()
+
+            # 只在主循环统一处理死亡流程
+            if player.hp <= 0:
+                player.set_dead()
+                if dead_time is None:
+                    dead_time = time.time()
+                    if not quit_sound_played:
+                        play_sfx(SFX_QUIT)
+                        quit_sound_played = True
+                # 死亡后延迟2秒退出
+                if dead_time is not None and (time.time() - dead_time) >= 2.0:
+                    running = False
 
         play_bgm(BGM_MENU)  # 游戏退出切回菜单BGM
 
@@ -526,7 +733,7 @@ class Settings:
                 set_mode(ControlMode.HAND)
             elif selected == "Arrow Keys":
                 set_mode(ControlMode.KEY)
-            print(f"Mode changé en: {selected}")
+            print(f"Mode changed to: {selected}")
             return True
         return False
 
