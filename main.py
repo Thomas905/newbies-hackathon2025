@@ -162,6 +162,7 @@ def layout_menu():
                 elif buttons[selected] == "Exit":
                     running = False
                 last_move_time = current_time
+
         if show_rage_quit_msg:
             elapsed = pygame.time.get_ticks() - rage_quit_timer
 
