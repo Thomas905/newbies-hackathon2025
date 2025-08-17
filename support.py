@@ -8,6 +8,7 @@ SCREEN_HEIGHT = 720
 class ControlMode(Enum):
     HAND = "hand"
     KEY = "key"
+    EYE = "eye"
 
 current_mode = ControlMode.HAND
 

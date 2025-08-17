@@ -468,7 +468,7 @@ class GameArea:
 
 class Settings:
     def __init__(self):
-        self.options = ["Hand Tracking", "Arrow Keys"]
+        self.options = ["Hand Tracking", "Arrow Keys", "Eyes Tracking"]
         self.selected_index = 0
         self.last_move_time = 0
         self.cooldown = 300
@@ -502,7 +502,9 @@ class Settings:
                 set_mode(ControlMode.HAND)
             elif selected == "Arrow Keys":
                 set_mode(ControlMode.KEY)
-            print(f"Mode changé en: {selected}")
+            elif selected == "Eyes Traking":
+                set_mode(ControlMode.EYE)
+            print(f"Changed Mode : {selected}")
             return True
         return False
 
@@ -537,7 +539,9 @@ class Settings:
                         detector.start_calibration()
                     elif selected == "Arrow Keys":
                         set_mode(ControlMode.KEY)
-                    print(f"Mode changé en: {selected}")
+                    elif selected == "Eyes Tracking":
+                        set_mode(ControlMode.EYE)
+                    print(f"Changed Mode : {selected}")
                     
                     running = False
 
