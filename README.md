@@ -48,3 +48,31 @@ The motion control is designed for **short bursts of gentle wrist activity**, he
 
 ## 📜 Credits
 Made during a hackathon, with love, laughs, and slightly sore wrists.
+
+# 关于 rebase 和 merge 的选择建议
+
+- **如果你的更改比远程更重要**，推荐使用 `rebase`，这样可以让你的提交排在远程提交之后，历史更线性，方便 review 和后续 push。
+- 具体做法：
+  1. 先拉取远程分支并 rebase 到你的本地分支：
+     ```
+     git pull --rebase origin fix/deadbug
+     ```
+  2. 如果有冲突，解决冲突后继续 rebase：
+     ```
+     git rebase --continue
+     ```
+  3. rebase 完成后再 push（如果远程已有你的旧提交，需要强推）：
+     ```
+     git push --force-with-lease
+     ```
+
+- **merge** 会保留两边的历史，产生一次合并提交。如果你希望保留所有历史（比如团队协作复杂、需要追溯每个人的分支），可以用 merge：
+  ```
+  git pull --no-rebase origin fix/deadbug
+  ```
+
+- **总结**：  
+  - 你想让你的更改“压”在远程之上、历史更干净，选 `rebase`。
+  - 你想保留所有分支的历史，选 `merge`。
+
+> ⚠️ 注意：rebase 后强推会覆盖远程分支历史，请确保团队成员知情。
